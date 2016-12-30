@@ -39,6 +39,8 @@ function startTsserver() {
 	process.stdin.pipe(tsserver.stdin);
 
 	tsserver.on('exit', function () {
+		debug('Server exited');
+
 		// If tsserver is exiting because the user asked it to, this process
 		// should also end
 		if (exiting) {
@@ -71,14 +73,17 @@ process.on('SIGINT', () => process.exit(0));
 process.on('SIGTERM', () => process.exit(0));
 
 process.on('exit', () => {
-	if (tsserver) {
-		tsserver.kill();
+	if (!alreadyRunning) {
+		if (tsserver) {
+			tsserver.kill();
+		}
+		// Ensure socket file is removed when process exits
+		unlink(socketFile, _err => {});
 	}
-	// Ensure socket file is removed when process exits
-	unlink(socketFile, _err => {});
 });
 
 let exiting = false;
+let alreadyRunning = false;
 let tsserver: ChildProcess;
 
 let serverBin = process.argv[2];
@@ -108,8 +113,6 @@ if (!serverBin) {
 const socketFile = getSocketFile(process.cwd());
 const clients: Socket[] = [];
 const loggers: Socket[] = [];
-
-startTsserver();
 
 const server = createServer(client => {
 	debug('Added client');
@@ -149,11 +152,20 @@ const server = createServer(client => {
 	});
 });
 
-server.on('error', function (err) {
-	error(`Error: ${err}`);
-	process.exit(1);
+server.on('error', (err: NodeJS.ErrnoException) => {
+	if (err.code === 'EADDRINUSE') {
+		debug(`Server is already running`);
+		log(`Listening on ${socketFile}...`);
+		alreadyRunning = true;
+		process.exit(0);
+	}
+	else {
+		error(`Error: ${err}`);
+		process.exit(1);
+	}
 });
 
 server.listen(socketFile, () => {
+	startTsserver();
 	log(`Listening on ${socketFile}...`);
 });

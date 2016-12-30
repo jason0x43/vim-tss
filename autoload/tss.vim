@@ -11,6 +11,10 @@ function! tss#start()
 	endif
 
 	let s:startup_file = expand('<afile>')
+	if s:startup_file == ''
+		let s:startup_file = expand('%')
+	endif
+
 	echom('Starting server for ' . s:startup_file)
 	let s:server_id = jobstart(['node', s:path . '/../bin/start.js'], {
 		\ 'on_stderr': function('s:StartupHandler'),
@@ -69,6 +73,7 @@ function! s:ExitHandler(job_id, code)
 	if a:job_id == s:server_id
 		" If the server job died, clear the server ID field
 		let s:server_id = 0
+		let s:started = 0
 	endif
 endfunction
 
@@ -83,6 +88,7 @@ function! s:StartupHandler(job_id, data)
 
 		" After the server starts, open the current file
 		if s:startup_file != ''
+			echom('Opening initial file ' . s:startup_file)
 			call tss#openFile(s:startup_file)
 		endif
 	endif
