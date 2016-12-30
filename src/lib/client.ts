@@ -12,11 +12,13 @@ interface LoggerRequest extends protocol.Request {
 
 export function closeFile(filename: string) {
 	return connect(filename).then(() => {
-		return sendRequest(<protocol.CloseRequest> {
+		const request: protocol.CloseRequest = {
+			seq: getSequence(),
+			type: 'request',
 			command: 'close',
-			arguments: { file: filename },
-			type: 'request'
-		});
+			arguments: { file: filename }
+		};
+		return sendRequest(request);
 	});
 }
 
@@ -28,10 +30,12 @@ export function end() {
 
 export function exit() {
 	return connect().then(() => {
-		return sendRequest(<protocol.ExitRequest> {
-			command: 'exit',
-			type: 'request'
-		}).then(end);
+		const request: protocol.ExitRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'exit'
+		};
+		return sendRequest(request).then(end);
 	});
 }
 
@@ -46,11 +50,13 @@ export function getFile() {
 
 export function getSemanticDiagnostics(filename: string) {
 	return connect(filename).then(() => {
-		return sendRequest<protocol.Diagnostic[]>(<protocol.SemanticDiagnosticsSyncRequest> {
+		const request: protocol.SemanticDiagnosticsSyncRequest = {
+			seq: getSequence(),
+			type: 'request',
 			command: 'semanticDiagnosticsSync',
-			arguments: { file: filename },
-			type: 'request'
-		}, (response, resolve) => {
+			arguments: { file: filename }
+		};
+		return sendRequest<protocol.Diagnostic[]>(request, (response, resolve) => {
 			resolve(response.body);
 		});
 	});
@@ -58,11 +64,13 @@ export function getSemanticDiagnostics(filename: string) {
 
 export function getSyntacticDiagnostics(filename: string) {
 	return connect(filename).then(() => {
-		return sendRequest<protocol.Diagnostic[]>(<protocol.SyntacticDiagnosticsSyncRequest> {
+		const request: protocol.SyntacticDiagnosticsSyncRequest = {
+			seq: getSequence(),
+			type: 'request',
 			command: 'syntacticDiagnosticsSync',
-			arguments: { file: filename },
-			type: 'request'
-		}, (response, resolve) => {
+			arguments: { file: filename }
+		};
+		return sendRequest<protocol.Diagnostic[]>(request, (response, resolve) => {
 			resolve(response.body);
 		});
 	});
@@ -70,20 +78,24 @@ export function getSyntacticDiagnostics(filename: string) {
 
 export function openFile(filename: string) {
 	return connect(filename).then(() => {
-		return sendRequest(<protocol.OpenRequest> {
+		const request: protocol.OpenRequest = {
+			seq: getSequence(),
+			type: 'request',
 			command: 'open',
-			arguments: { file: filename },
-			type: 'request'
-		}).then(end);
+			arguments: { file: filename }
+		};
+		return sendRequest(request).then(end);
 	});
 }
 
 export function registerLogger() {
 	return connect().then(() => {
-		return sendRequest(<LoggerRequest> {
-			command: 'logger',
-			type: 'request'
-		});
+		const request: LoggerRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'logger'
+		};
+		return sendRequest(request);
 	}).then(() => {
 		return client;
 	});
@@ -91,13 +103,16 @@ export function registerLogger() {
 
 export function reloadFile(filename: string) {
 	return connect(filename).then(() => {
-		return sendRequest<void>(<protocol.ReloadRequest> {
+		const request: protocol.ReloadRequest = {
+			seq: getSequence(),
+			type: 'request',
 			command: 'reload',
 			arguments: {
 				file: filename,
 				tmpfile: filename
 			}
-		}, (response, resolve) => {
+		};
+		return sendRequest<void>(request, (response, resolve) => {
 			if (response.body && response.body['reloadFinished']) {
 				resolve();
 			}
@@ -134,10 +149,11 @@ function connect(filename?: string) {
 	return connected;
 }
 
-function sendRequest<T>(request: protocol.Request, callback?: RequestCallback<T>): Promise<T> {
-	request.seq = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-	request.type = 'request';
+function getSequence() {
+	return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+}
 
+function sendRequest<T>(request: protocol.Request, callback?: RequestCallback<T>): Promise<T> {
 	return send(client, request).then(() => {
 		if (!callback) {
 			return;
