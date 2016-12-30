@@ -1,0 +1,15 @@
+{
+  "author": "jason0x43",
+  "description": "Vim plugin for using TypeScript Services",
+  "devDependencies": {
+    "@types/node": "~6.0.0",
+    "typescript": "~2.1.0"
+  },
+  "license": "MIT",
+  "name": "vim-ts",
+  "repository": "https://github.com/jason0x43/vim-ts.git",
+  "scripts": {
+    "install": "tsc"
+  },
+  "version": "0.1.0"
+}
