@@ -5,6 +5,7 @@
 import { createConnection, Socket } from 'net';
 import { MessageHandler, send } from './messages';
 import { getSocketFile } from './connect';
+import { readFile } from 'fs';
 
 interface LoggerRequest extends protocol.Request {
 	command: 'logger';
@@ -36,6 +37,48 @@ export function exit() {
 			command: 'exit'
 		};
 		return sendRequest(request).then(end);
+	});
+}
+
+export function format(filename: string) {
+	const lineCount = new Promise<{ lineCount: number, lastLineOffset: number }>((resolve, reject) => {
+		readFile(filename, (err, data) => {
+			if (err) {
+				reject(err);
+			}
+			else {
+				const lineCount = data.reduce((count, item) => {
+					if (item === newline) {
+						count++;
+					}
+					return count;
+				}, 0);
+				const lastLineOffset = data.length - data.lastIndexOf(newline);
+				resolve({ lineCount, lastLineOffset });
+			}
+		});
+	});
+
+	return Promise.all([ lineCount, connect() ]).then(results => {
+		const result = results[0];
+		const request: protocol.FormatRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'format',
+			arguments: {
+				line: 1,
+				offset: 1,
+				endLine: result.lineCount,
+				endOffset: result.lastLineOffset,
+				file: filename,
+				options: {
+					convertTabsToSpaces: false
+				}
+			}
+		};
+		return sendRequest<protocol.CodeEdit[]>(request, (response, resolve) => {
+			resolve(response.body);
+		});
 	});
 }
 
@@ -121,6 +164,8 @@ export function reloadFile(filename: string) {
 }
 
 type RequestCallback<T> = (response: protocol.Response, resolve: (value?: T) => void, reject: (error?: Error) => void) => void;
+
+const newline = 10;
 
 let client: Socket;
 let connected: Promise<Socket>;

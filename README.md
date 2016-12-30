@@ -36,6 +36,7 @@ The plugin consists of a thin layer of Vim script that calls out to several Java
 	* `open` - Let tsserver know a file is being edited.
 	* `close` - Let tsserver know a file is no longer being edited.
 	* `errors` - List compile errors for a given file.
+	* `format` - List edits required to properly format a given file
 
 Client scripts such as `open` and `errors` open connections to the running server's port to communicate with it.
 
