@@ -4,6 +4,26 @@ let s:startup_file = ''
 let s:started = 0
 let s:job_names = {}
 
+function! tss#closeFile(file)
+	call tss#debug('Closing ' . a:file)
+	let job = jobstart(['node', s:path . '/../bin/close.js', a:file], {
+		\ 'on_exit': function('s:ExitHandler')
+		\ })
+	let s:job_names[job] = 'Close ' . a:file
+endfunction
+
+function! tss#debug(message)
+	if g:tss_verbose
+		echom('TSS: ' . a:message)
+	endif
+endfunction
+
+function! tss#error(message)
+	if g:tss_verbose
+		echoe('TSS: ' . a:message)
+	endif
+endfunction
+
 function! tss#format()
 	let file = expand('%')
 	let tmpfile = tempname()
@@ -16,6 +36,15 @@ function! tss#format()
 	call s:Format(lines)
 
 	call delete(tmpfile)
+endfunction
+
+function! tss#openFile(file)
+	call tss#debug('Opening ' . a:file)
+	let job = jobstart(['node', s:path . '/../bin/open.js', a:file], {
+		\ 'on_stderr': function('s:LogHandler'),
+		\ 'on_exit': function('s:ExitHandler')
+		\ })
+	let s:job_names[job] = 'Open ' . a:file
 endfunction
 
 function! tss#start()
@@ -45,44 +74,19 @@ function! tss#stop()
 
 	echom('Stopping server')
 	let job = jobstart(['node', s:path . '/../bin/stop.js'], {
+		\ 'on_stderr': function('s:LogHandler'),
 		\ 'on_exit': function('s:ExitHandler')
 		\ })
 	let s:server_id = 0
 	let s:job_names[job] = 'Server stop'
 endfunction 
 
-function! tss#openFile(file)
-	call tss#debug('Opening ' . a:file)
-	let job = jobstart(['node', s:path . '/../bin/open.js', a:file], {
-		\ 'on_exit': function('s:ExitHandler')
-		\ })
-	let s:job_names[job] = 'Opened ' . a:file
-endfunction
-
-function! tss#closeFile(file)
-	call tss#debug('Closing ' . a:file)
-	let job = jobstart(['node', s:path . '/../bin/close.js', a:file], {
-		\ 'on_exit': function('s:ExitHandler')
-		\ })
-	let s:job_names[job] = 'Closed ' . a:file
-endfunction
-
-function! tss#debug(message)
-	if g:tss_verbose
-		echom('TSS: ' . message)
-	endif
-endfunction
-
-function! tss#error(message)
-	if g:tss_verbose
-		echoe('TSS: ' . message)
-	endif
-endfunction
-
 function! s:ExitHandler(job_id, code)
 	if a:code 
 		call tss#error(s:job_names[a:job_id] . ' failed: ' . a:code)
 	endif
+
+	call tss#debug(s:job_names[a:job_id] . ' ended')
 
 	if a:job_id == s:server_id
 		" If the server job died, clear the server ID field
@@ -150,6 +154,10 @@ function! s:Format(lines)
 
 	" Restore the cursor position
 	call winrestview(view)
+endfunction 
+
+function! s:LogHandler(job_id, data)
+	echom('Log: ' . join(a:data))
 endfunction 
 
 function! s:StartHandler(job_id, data)
