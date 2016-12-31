@@ -157,7 +157,7 @@ function! s:Format(lines)
 endfunction 
 
 function! s:LogHandler(job_id, data)
-	echom('Log: ' . join(a:data))
+	call tss#debug('Log: ' . join(a:data))
 endfunction 
 
 function! s:StartHandler(job_id, data)
