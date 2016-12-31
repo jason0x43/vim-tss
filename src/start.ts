@@ -5,7 +5,7 @@
 import { ChildProcess, execSync, spawn } from 'child_process';
 import { createServer, Socket } from 'net';
 import { join } from 'path';
-import { unlink, statSync } from 'fs';
+import { statSync, unlink } from 'fs';
 import { debug, error, log, print } from './lib/log';
 import { MessageHandler } from './lib/messages';
 import { getSocketFile } from './lib/connect';
@@ -145,7 +145,7 @@ const server = createServer(client => {
 	});
 
 	client.on('end', () => {
-		clients.splice(clients.indexOf(client, 1));
+		clients.splice(clients.indexOf(client), 1);
 		debug('Removed client');
 
 		const logger = loggers.indexOf(client);
@@ -153,6 +153,10 @@ const server = createServer(client => {
 			loggers.splice(logger, 1);
 			debug('Removed logger');
 		}
+	});
+
+	client.on('error', err => {
+		error(`Client error: ${err}`);
 	});
 });
 
