@@ -6,6 +6,7 @@ import { createConnection, Socket } from 'net';
 import { MessageHandler, send } from './messages';
 import { getProjectRoot, getSocketFile } from './connect';
 import { readFile } from 'fs';
+import { join } from 'path';
 
 interface LoggerRequest extends protocol.Request {
 	command: 'logger';
@@ -43,7 +44,7 @@ export function configure(filename: string = null) {
 	return Promise.all([ formatOptions, connect() ]).then(results => {
 		const [ formatOptions ] = results;
 		const request: protocol.ConfigureRequest = {
-			seq: getRandomInt(),
+			seq: getSequence(),
 			type: 'request',
 			command: 'configure',
 			arguments: { formatOptions }
@@ -52,12 +53,18 @@ export function configure(filename: string = null) {
 	});
 }
 
+/**
+ * Close the client socket
+ */
 export function end() {
 	if (client) {
 		client.end();
 	}
 }
 
+/**
+ * Tell tsserver to exit gracefully
+ */
 export function exit() {
 	return connect().then(() => {
 		const request: protocol.ExitRequest = {
@@ -69,40 +76,44 @@ export function exit() {
 	});
 }
 
-export function format(filename: string) {
-	const lineCount = new Promise<{ lineCount: number, lastLineOffset: number }>((resolve, reject) => {
+/**
+ * A file range
+ */
+export interface FileRange extends protocol.Location {
+	endLine: number;
+	endOffset: number;
+}
+
+export function getFileExtent(filename: string) {
+	return new Promise<FileRange>((resolve, reject) => {
 		readFile(filename, (err, data) => {
 			if (err) {
 				reject(err);
 			}
 			else {
-				const lineCount = data.reduce((count, item) => {
-					if (item === newline) {
-						count++;
-					}
-					return count;
-				}, 0);
-				const lastLineOffset = data.length - data.lastIndexOf(newline);
-				resolve({ lineCount, lastLineOffset });
+				const endLine = data.reduce((count, item) => item === newline ? count + 1 : count, 0);
+				const endOffset = data.length - data.lastIndexOf(newline);
+				resolve({ line: 1, offset: 1, endLine, endOffset });
 			}
 		});
 	});
+}
 
-	return Promise.all([ lineCount, connect() ]).then(results => {
-		const result = results[0];
+export function format(filename: string, fileExtent?: FileRange | Promise<FileRange>) {
+	const range = fileExtent || getFileExtent(filename);
+
+	return Promise.all([ range, connect() ]).then(results => {
+		const [ range ] = results;
 		const request: protocol.FormatRequest = {
 			seq: getSequence(),
 			type: 'request',
 			command: 'format',
 			arguments: {
-				line: 1,
-				offset: 1,
-				endLine: result.lineCount,
-				endOffset: result.lastLineOffset,
-				file: filename,
-				options: {
-					convertTabsToSpaces: false
-				}
+				line: range.line,
+				offset: range.offset,
+				endLine: range.endLine,
+				endOffset: range.endOffset,
+				file: filename
 			}
 		};
 		return sendRequest<protocol.CodeEdit[]>(request, (response, resolve) => {
@@ -111,9 +122,9 @@ export function format(filename: string) {
 	});
 }
 
-export function getFile() {
+export function getFile(required = true) {
 	const filename = process.argv[2];
-	if (!filename) {
+	if (!filename && required) {
 		console.error('Error: A filename is required');
 		process.exit(1);
 	}
@@ -173,7 +184,7 @@ export function registerLogger() {
 	});
 }
 
-export function reloadFile(filename: string) {
+export function reloadFile(filename: string, tmpfile?: string) {
 	return connect(filename).then(() => {
 		const request: protocol.ReloadRequest = {
 			seq: getSequence(),
@@ -181,7 +192,7 @@ export function reloadFile(filename: string) {
 			command: 'reload',
 			arguments: {
 				file: filename,
-				tmpfile: filename
+				tmpfile: tmpfile || filename
 			}
 		};
 		return sendRequest<void>(request, (response, resolve) => {
