@@ -1,3 +1,4 @@
+command! -buffer TssFormat :call tss#format()
 command! -buffer TssStart :call tss#start()
 command! -buffer TssStop :call tss#stop()
 

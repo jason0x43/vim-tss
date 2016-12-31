@@ -4,6 +4,20 @@ let s:startup_file = ''
 let s:started = 0
 let s:job_names = {}
 
+function! tss#format()
+	let file = expand('%')
+	let tmpfile = tempname()
+
+	call tss#debug('Saving to temp file ' . tmpfile)
+	call execute('w ' . tmpfile)
+
+	call tss#debug('Formatting ' . file)
+	let lines = systemlist('node ' . shellescape(s:path . '/../bin/format.js') . ' ' . shellescape(file) . ' ' . shellescape(tmpfile))
+	call s:Format(lines)
+
+	call delete(tmpfile)
+endfunction
+
 function! tss#start()
 	" Don't start the server if it's already running
 	if s:server_id
@@ -17,7 +31,7 @@ function! tss#start()
 
 	echom('Starting server for ' . s:startup_file)
 	let s:server_id = jobstart(['node', s:path . '/../bin/start.js'], {
-		\ 'on_stderr': function('s:StartupHandler'),
+		\ 'on_stderr': function('s:StartHandler'),
 		\ 'on_exit': function('s:ExitHandler')
 		\ })
 	let s:job_names[s:server_id] = 'Server start'
@@ -77,10 +91,74 @@ function! s:ExitHandler(job_id, code)
 	endif
 endfunction
 
-function! s:StartupHandler(job_id, data)
+function! s:Format(lines)
+	if len(a:lines) == 0
+		return
+	endif
+
+	" Save properties to restore later
+	let view = winsaveview()
+	let mark = split(execute('silent! marks k'))
+	let tmp = getreg('m')
+	let oldve = &ve
+
+	" Allow selection to be one past EOL
+	set ve+=onemore
+
+	for line in a:lines
+		if line == ''
+			continue
+		endif
+
+		call tss#debug('Processing format line <<<' . line . '>>>')
+
+		let parts = matchlist(line, '\([^(]\+\)(\(\d\+\),\(\d\+\)\.\.\(\d\+\),\(\d\+\)): \(.*\)')
+		if len(parts) == 0
+			continue 
+		endif 
+
+		let startLine = parts[2]
+		let startOffset = parts[3]
+		let endLine = parts[4]
+		let endOffset = parts[5]
+
+		call cursor(endLine, endOffset)
+		:normal mk
+		call cursor(startLine, startOffset)
+		:normal d`k
+		call tss#debug('Deleted text from (' . startLine . ',' . startOffset . ') to (' . endLine . ',' . endOffset . ')')
+
+		call setreg('m', parts[6])
+		let @m = parts[6]
+		:normal "mP
+		call tss#debug('Inserted "' . parts[6] . '" at (' . startLine . ',' . startOffset . ')')
+	endfor
+
+	"Restore the ve setting
+	let &ve = oldve
+
+	" Restore the 'm' register
+	call setreg('m', tmp)
+
+	" Restore the mark if it previously existed, or delete it
+	if mark[0] == 'mark'
+		call cursor(mark[5], mark[6])
+		:normal mk
+	else 
+		:normal delmarks k
+	endif
+
+	" Restore the cursor position
+	call winrestview(view)
+endfunction 
+
+function! s:StartHandler(job_id, data)
+	call s:LogHandler(a:job_id, a:data)
+
 	if s:started 
 		return 
 	endif
+
 	let data = join(a:data)
 	if data =~ 'Listening on'
 		let s:started = 1
