@@ -4,7 +4,7 @@
 
 import { createConnection, Socket } from 'net';
 import { MessageHandler, send } from './messages';
-import { getSocketFile } from './connect';
+import { getProjectRoot, getSocketFile } from './connect';
 import { readFile } from 'fs';
 
 interface LoggerRequest extends protocol.Request {
@@ -18,6 +18,35 @@ export function closeFile(filename: string) {
 			type: 'request',
 			command: 'close',
 			arguments: { file: filename }
+		};
+		return sendRequest(request);
+	});
+}
+
+export function configure(filename: string = null) {
+	if (!filename) {
+		filename = join(getProjectRoot('.'), 'tsconfig.json');
+	}
+
+	const formatOptions = new Promise((resolve, reject) => {
+		readFile(filename, (err, data) => {
+			if (err) {
+				reject(err);
+			}
+			else {
+				const config = JSON.parse(data.toString('utf8'));
+				resolve(config.formatCodeOptions);
+			}
+		});
+	});
+
+	return Promise.all([ formatOptions, connect() ]).then(results => {
+		const [ formatOptions ] = results;
+		const request: protocol.ConfigureRequest = {
+			seq: getRandomInt(),
+			type: 'request',
+			command: 'configure',
+			arguments: { formatOptions }
 		};
 		return sendRequest(request);
 	});

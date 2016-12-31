@@ -9,7 +9,7 @@ export function getSocketFile(fileOrDir: string) {
 	return join(tmpdir(), `vim-tsserve.${hash.digest('hex')}.sock`);
 }
 
-function getProjectRoot(fileOrDir: string): string {
+export function getProjectRoot(fileOrDir: string): string {
 	const path = resolve(fileOrDir);
 
 	const stats = statSync(path);

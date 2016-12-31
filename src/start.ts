@@ -9,6 +9,7 @@ import { unlink, statSync } from 'fs';
 import { debug, error, log, print } from './lib/log';
 import { MessageHandler } from './lib/messages';
 import { getSocketFile } from './lib/connect';
+import { configure } from './lib/client';
 
 function commandExists(command: string) {
 	try {
@@ -67,6 +68,9 @@ function startTsserver() {
 	tsserver.stderr.on('data', data => {
 		log(data);
 	});
+
+	// configure the newly created server
+	configure().catch(error);
 }
 
 process.on('SIGINT', () => process.exit(0));
