@@ -24,15 +24,46 @@ function! tss#error(message)
 	endif
 endfunction
 
+function! s:jumpTo(type)
+	let file = expand('%')
+	let pos = getcurpos()
+	let tmpfile = tempname()
+
+	if &modified
+		call tss#debug('Saving to temp file ' . tmpfile)
+		call execute('w ' . tmpfile)
+		call system('node ' . shellescape(s:path . '/../bin/reload.js') . ' ' . shellescape(file) . ' ' . shellescape(tmpfile))
+	endif
+
+	call tss#debug('Finding ' . a:type)
+	let lines = systemlist('node ' . shellescape(s:path . '/../bin/' . a:type . '.js') . ' ' . shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
+	call s:Destinations(lines)
+
+	call delete(tmpfile)
+endfunction 
+
+function! tss#definition()
+	call s:jumpTo('definition')
+endfunction
+
+function! tss#implementation()
+	call s:jumpTo('implementation')
+endfunction
+
+function! tss#references()
+	call s:jumpTo('references')
+endfunction
+
 function! tss#format()
 	let file = expand('%')
 	let tmpfile = tempname()
 
 	call tss#debug('Saving to temp file ' . tmpfile)
 	call execute('w ' . tmpfile)
+	call system('node ' . shellescape(s:path . '/../bin/reload.js') . ' ' . shellescape(file) . ' ' . shellescape(tmpfile))
 
 	call tss#debug('Formatting ' . file)
-	let lines = systemlist('node ' . shellescape(s:path . '/../bin/format.js') . ' ' . shellescape(file) . ' ' . shellescape(tmpfile))
+	let lines = systemlist('node ' . shellescape(s:path . '/../bin/format.js') . ' ' . shellescape(file))
 	call s:Format(lines)
 
 	call delete(tmpfile)
@@ -94,6 +125,33 @@ function! s:ExitHandler(job_id, code)
 		let s:started = 0
 	endif
 endfunction
+
+function! s:Destinations(lines)
+	if len(a:lines) == 0
+		return 
+	endif 
+
+	let destinations = []
+
+	for line in a:lines 
+		let parts = matchlist(line, '\([^(]\+\)(\(\d\+\),\(\d\+\)): \(.*\)')
+		if len(parts) == 0
+			call tss#debug('Invalid destination line: "' . a:lines[0] . '"')
+			continue
+		endif 
+
+		let destinations = add(destinations, {
+			\ 'filename': parts[1],
+			\ 'lnum': parts[2],
+			\ 'col': parts[3],
+			\ 'text': parts[4]
+			\ })
+	endfor
+
+	call setloclist(0, destinations)
+
+	ll 1
+endfunction 
 
 function! s:Format(lines)
 	if len(a:lines) == 0

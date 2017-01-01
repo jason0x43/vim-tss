@@ -8,8 +8,9 @@ import { getProjectRoot, getSocketFile } from './connect';
 import { readFile } from 'fs';
 import { join } from 'path';
 
-interface LoggerRequest extends protocol.Request {
-	command: 'logger';
+export interface FileLocation extends protocol.Location {
+	file: string;
+	text?: string;
 }
 
 export function closeFile(filename: string) {
@@ -50,6 +51,20 @@ export function configure(filename: string = null) {
 			arguments: { formatOptions }
 		};
 		return sendRequest(request);
+	});
+}
+
+export function definition(fileLocation: FileLocation) {
+	return connect().then(() => {
+		const request: protocol.DefinitionRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'definition',
+			arguments: fileLocation
+		};
+		return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
+			resolve(response.body);
+		});
 	});
 }
 
@@ -122,15 +137,6 @@ export function format(filename: string, fileExtent?: FileRange | Promise<FileRa
 	});
 }
 
-export function getFile(required = true) {
-	const filename = process.argv[2];
-	if (!filename && required) {
-		console.error('Error: A filename is required');
-		process.exit(1);
-	}
-	return filename;
-}
-
 export function getSemanticDiagnostics(filename: string) {
 	return connect(filename).then(() => {
 		const request: protocol.SemanticDiagnosticsSyncRequest = {
@@ -159,6 +165,20 @@ export function getSyntacticDiagnostics(filename: string) {
 	});
 }
 
+export function implementation(fileLocation: FileLocation) {
+	return connect().then(() => {
+		const request: protocol.ImplementationRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'implementation',
+			arguments: fileLocation
+		};
+		return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
+			resolve(response.body);
+		});
+	});
+}
+
 export function openFile(filename: string) {
 	return connect(filename).then(() => {
 		const request: protocol.OpenRequest = {
@@ -168,6 +188,20 @@ export function openFile(filename: string) {
 			arguments: { file: filename }
 		};
 		return sendRequest(request).then(end);
+	});
+}
+
+export function references(fileLocation: FileLocation) {
+	return connect().then(() => {
+		const request: protocol.ReferencesRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'references',
+			arguments: fileLocation
+		};
+		return sendRequest<protocol.ReferencesResponseBody>(request, (response, resolve) => {
+			resolve(response.body);
+		});
 	});
 }
 
@@ -203,7 +237,13 @@ export function reloadFile(filename: string, tmpfile?: string) {
 	});
 }
 
-type RequestCallback<T> = (response: protocol.Response, resolve: (value?: T) => void, reject: (error?: Error) => void) => void;
+interface LoggerRequest extends protocol.Request {
+	command: 'logger';
+}
+
+interface RequestCallback<T> {
+	(response: protocol.Response, resolve: (value?: T) => void, reject: (error?: Error) => void): void;
+}
 
 const newline = 10;
 

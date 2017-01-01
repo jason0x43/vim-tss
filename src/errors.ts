@@ -2,13 +2,25 @@
  * Get syntax errors
  */
 
-import { end, getFile, reloadFile, getSemanticDiagnostics, getSyntacticDiagnostics } from './lib/client';
+import { end, reloadFile, getSemanticDiagnostics, getSyntacticDiagnostics } from './lib/client';
 import { error, print } from './lib/log';
+import parseArgs = require('minimist');
 
-const filename = getFile();
+const argv = parseArgs(process.argv.slice(2), {
+	boolean: [ 'reload' ],
+	alias: { 'reload': 'r' }
+});
+
+const filename = argv._[0];
+if (!filename) {
+	error('Filename is required');
+	process.exit(1);
+}
+
 let hasErrors = false;
+let promise = argv['reload'] ? reloadFile(filename) : Promise.resolve();
 
-reloadFile(filename).then(() => {
+promise.then(() => {
 	return Promise.all([ getSyntacticDiagnostics(filename), getSemanticDiagnostics(filename) ]);
 }).then(allDiags => {
 	hasErrors = allDiags.some(diags => diags.length > 0);

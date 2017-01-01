@@ -8,13 +8,18 @@ export function debug(...args: any[]) {
 	_debug(...args);
 }
 
-export function log(...args: any[]) {
-	const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-	process.stderr.write(`${time} ${format.apply(null, args)}\n`);
+export function die(...args: any[]) {
+	error(...args);
+	process.exit(1);
 }
 
 export function error(...args: any[]) {
 	log(...args);
+}
+
+export function log(...args: any[]) {
+	const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+	process.stderr.write(`${time} ${format.apply(null, args)}\n`);
 }
 
 export function print(message: Buffer | string) {

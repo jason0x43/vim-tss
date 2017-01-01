@@ -2,29 +2,40 @@
  * Get formatting hints
  */
 
-import { end, getFile, getFileExtent, format, reloadFile, FileRange } from './lib/client';
+import { end, format, FileRange, reloadFile } from './lib/client';
 import { debug, error, print } from './lib/log';
+import parseArgs = require('minimist');
 
-const filename = getFile();
+const argv = parseArgs(process.argv.slice(2), {
+	boolean: [ 'reload' ],
+	alias: { 'reload': 'r' }
+});
 
-// If provided, this file is considered to be the true source of file data
-const realfile = process.argv[3];
-
-let promise = Promise.resolve();
-let range: Promise<FileRange>;
-
-// If a realfile was provided, tell the server to update its view of the file
-if (realfile) {
-	promise = reloadFile(filename, realfile);
-	range = getFileExtent(realfile);
+const filename = argv._[0];
+if (!filename) {
+	error('Filename is required');
+	process.exit(1);
 }
 
-promise.then(() => format(filename, range))
-	.then(edits => {
-		debug(`Got edits`);
-		edits.slice().reverse().forEach(edit => {
-			print(`${filename}(${edit.start.line},${edit.start.offset}..${edit.end.line},${edit.end.offset}): ${edit.newText}\n`);
-		});
-	})
-	.catch(error)
-	.then(end);
+let range: FileRange;
+
+if (argv._.length >= 5) {
+	const line = Number(argv._[1]);
+	const offset = Number(argv._[2]);
+	const endLine = Number(argv._[3]);
+	const endOffset = Number(argv._[4]);
+	range = { line, offset, endLine, endOffset };
+}
+
+let promise = argv['reload'] ? reloadFile(filename) : Promise.resolve();
+
+promise.then(() => {
+	return format(filename, range);
+}).then(edits => {
+	debug(`Got edits`);
+	edits.slice().reverse().forEach(edit => {
+		print(`${filename}(${edit.start.line},${edit.start.offset}..${edit.end.line},${edit.end.offset}): ${edit.newText}\n`);
+	});
+})
+.catch(error)
+.then(end);

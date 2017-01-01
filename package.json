@@ -1,7 +1,11 @@
 {
   "author": "jason0x43",
   "description": "Vim plugin for using TypeScript Services",
+  "dependencies": {
+    "minimist": "~1.2.0"
+  },
   "devDependencies": {
+    "@types/minimist": "~1.2.0",
     "@types/node": "~6.0.0",
     "typescript": "~2.1.0"
   },

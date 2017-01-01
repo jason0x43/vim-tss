@@ -1,4 +1,8 @@
-import { configure, end, getFile } from './lib/client';
+import { configure, end } from './lib/client';
 import { error } from './lib/log';
+import parseArgs = require('minimist');
 
-configure(getFile(false)).catch(error).then(end);
+const argv = parseArgs(process.argv.slice(2));
+const filename = argv._[0];
+
+configure(filename).catch(error).then(end);
