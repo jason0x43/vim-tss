@@ -114,6 +114,13 @@ function! tss#references()
 	call s:getLocations('references')
 endfunction
 
+" Called before saving a TS file
+function! tss#preSave()
+	if g:tss_format_on_save 
+		call tss#format()
+	endif
+endfunction 
+
 " Start an instance of tsserver for the current TS project
 function! tss#start()
 	" Don't start the server if it's already running
