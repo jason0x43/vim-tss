@@ -4,7 +4,7 @@
 
 import { parseArgs } from './lib/locate';
 import { end, quickInfo } from './lib/client';
-import { print } from './lib/log';
+import { debug, print } from './lib/log';
 
 const fileLocation = parseArgs();
 
@@ -18,8 +18,11 @@ quickInfo(fileLocation)
 			}
 		}
 		else {
-			print('There is no hint at the cursor.');
+			print('There is no hint at the cursor.\n');
 		}
 	})
-	.catch(() => print('There is no hint at the cursor.'))
+	.catch(err => {
+		debug(err);
+		print('There is no hint at the cursor.\n');
+	})
 	.then(end);

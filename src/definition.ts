@@ -4,12 +4,15 @@
 
 import { parseArgs, printFileLocation, toFileLocations } from './lib/locate';
 import { end, definition } from './lib/client';
-import { error } from './lib/log';
+import { debug, print } from './lib/log';
 
 const fileLocation = parseArgs();
 
 definition(fileLocation)
 	.then(spans => toFileLocations(spans, true))
 	.then(locations => locations.forEach(printFileLocation))
-	.catch(error)
+	.catch(err => {
+		debug(err);
+		print('No results\n');
+	})
 	.then(end);
