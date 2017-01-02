@@ -15,7 +15,7 @@ endfunction
 " Log a debug message
 function! tss#debug(message)
 	if g:tss_verbose
-		call tss#debug('TSS: ' . a:message)
+		echom('TSS: ' . a:message)
 	endif
 endfunction
 
