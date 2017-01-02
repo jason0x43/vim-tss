@@ -1,15 +1,14 @@
 /**
- * Get the location(s) where a symbol is implemented
+ * Print the location(s) where a symbol is implemented
  */
 
 import { parseArgs, printFileLocation, toFileLocations } from './lib/locate';
-import { end, implementation, reloadFile } from './lib/client';
+import { end, implementation } from './lib/client';
 import { error } from './lib/log';
 
-const { argv, fileLocation } = parseArgs();
-let promise: Promise<any> = argv['reload'] ? reloadFile(fileLocation.file) : Promise.resolve();
+const fileLocation = parseArgs();
 
-promise.then(() => implementation(fileLocation))
+implementation(fileLocation)
 	.then(spans => toFileLocations(spans))
 	.then(locations => locations.forEach(printFileLocation))
 	.catch(error)

@@ -1,4 +1,9 @@
+/**
+ * Display requests and responses for the current project's tsserver
+ */
+
 import { registerLogger } from './lib/client';
+import { die } from './lib/log';
 
 registerLogger().then(client => {
 	client.on('data', data => {
@@ -6,8 +11,7 @@ registerLogger().then(client => {
 	});
 
 	client.on('error', error => {
-		console.error('Error: ' + error.message);
-		process.exit(1);
+		die('Error: ' + error.message);
 	});
 
 	client.on('close', () => {

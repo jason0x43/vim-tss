@@ -1,86 +1,123 @@
 let s:path = expand('<sfile>:p:h')
-let s:server_id = 0
 let s:startup_file = ''
-let s:started = 0
+let s:ready = 0
 let s:job_names = {}
 
+" Notify tsserver that a file is no longer being edited
 function! tss#closeFile(file)
 	call tss#debug('Closing ' . a:file)
 	let job = jobstart(['node', s:path . '/../bin/close.js', a:file], {
-		\ 'on_exit': function('s:ExitHandler')
+		\ 'on_exit': function('s:exitHandler')
 		\ })
 	let s:job_names[job] = 'Close ' . a:file
 endfunction
 
+" Log a debug message
 function! tss#debug(message)
 	if g:tss_verbose
 		echom('TSS: ' . a:message)
 	endif
 endfunction
 
+" Populate the location list with the locations of definitions of the symbol
+" at the current cursor position
+function! tss#definition()
+	call s:getLocations('definition')
+endfunction
+
+" Log an error message
 function! tss#error(message)
 	if g:tss_verbose
 		echoe('TSS: ' . a:message)
 	endif
 endfunction
 
-function! s:jumpTo(type)
-	let file = expand('%')
-	let pos = getcurpos()
-	let tmpfile = tempname()
+" Populate the quickfix list with errors for the current buffer 
+function! tss#errors()
+	" Clear the quickfix list
+	call setqflist([], 'r')
 
-	if &modified
-		call tss#debug('Saving to temp file ' . tmpfile)
-		call execute('w ' . tmpfile)
-		call system('node ' . shellescape(s:path . '/../bin/reload.js') . ' ' . shellescape(file) . ' ' . shellescape(tmpfile))
+	let file = expand('%')
+
+	" Ensure tsserver view of file is up-to-date
+	call s:reloadFile(file)
+
+	call tss#debug('Getting errors for ' . file)
+	let lines = systemlist('node ' . shellescape(s:path . '/../bin/errors.js')
+		\ . ' ' . shellescape(file) . ' -n')
+	call tss#debug('Got ' . len(lines) . ' error lines')
+
+	let current_err = {}
+
+	for line in lines
+		let parts = matchlist(line,
+			\ '\([^(]\+\)(\(\d\+\),\(\d\+\)): error \(.*\)')
+		if len(parts) > 0
+			if !empty(current_err)
+				" If we were filling in an error, it's done now, so add it to
+				" the list
+				call tss#debug('Added error to qflist')
+				call setqflist([current_err], 'a')
+			endif
+			let current_err = {
+				\ 'filename': parts[1],
+				\ 'lnum': parts[2],
+				\ 'col': parts[3],
+				\ 'text': parts[4]
+				\ }
+		else 
+			let current_err['text'] = current_err['text'] + line
+		endif
+	endfor
+
+	if !empty(current_err)
+		call setqflist([current_err], 'a')
 	endif
 
-	call tss#debug('Finding ' . a:type)
-	let lines = systemlist('node ' . shellescape(s:path . '/../bin/' . a:type . '.js') . ' ' . shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
-	call s:Destinations(lines)
-
-	call delete(tmpfile)
-endfunction 
-
-function! tss#definition()
-	call s:jumpTo('definition')
+	" Open or close the qf window as necessary
+	cwindow
 endfunction
 
-function! tss#implementation()
-	call s:jumpTo('implementation')
-endfunction
-
-function! tss#references()
-	call s:jumpTo('references')
-endfunction
-
+" Format the current buffer. This is a synchronous command because we don't
+" want the user interacting with the buffer while it's being formatted.
 function! tss#format()
 	let file = expand('%')
-	let tmpfile = tempname()
 
-	call tss#debug('Saving to temp file ' . tmpfile)
-	call execute('w ' . tmpfile)
-	call system('node ' . shellescape(s:path . '/../bin/reload.js') . ' ' . shellescape(file) . ' ' . shellescape(tmpfile))
+	" Ensure tsserver view of file is up-to-date
+	call s:reloadFile(file)
 
 	call tss#debug('Formatting ' . file)
-	let lines = systemlist('node ' . shellescape(s:path . '/../bin/format.js') . ' ' . shellescape(file))
-	call s:Format(lines)
-
-	call delete(tmpfile)
+	let lines = systemlist('node ' . shellescape(s:path . '/../bin/format.js')
+		\ . ' ' . shellescape(file))
+	call s:format(lines)
 endfunction
 
+" Populate the location list with the locations of implementations of the
+" symbol at the current cursor position
+function! tss#implementation()
+	call s:getLocations('implementation')
+endfunction
+
+" Notify tsserver that a file is being edited
 function! tss#openFile(file)
 	call tss#debug('Opening ' . a:file)
 	let job = jobstart(['node', s:path . '/../bin/open.js', a:file], {
-		\ 'on_stderr': function('s:LogHandler'),
-		\ 'on_exit': function('s:ExitHandler')
+		\ 'on_stderr': function('s:logHandler'),
+		\ 'on_exit': function('s:exitHandler')
 		\ })
 	let s:job_names[job] = 'Open ' . a:file
 endfunction
 
+" Populate the location list with references to the symbol at the current
+" cursor position
+function! tss#references()
+	call s:getLocations('references')
+endfunction
+
+" Start an instance of tsserver for the current TS project
 function! tss#start()
 	" Don't start the server if it's already running
-	if s:server_id
+	if g:tss_server_id
 		return
 	endif
 
@@ -90,70 +127,45 @@ function! tss#start()
 	endif
 
 	echom('Starting server for ' . s:startup_file)
-	let s:server_id = jobstart(['node', s:path . '/../bin/start.js'], {
-		\ 'on_stderr': function('s:StartHandler'),
-		\ 'on_exit': function('s:ExitHandler')
+	let g:tss_server_id = jobstart(['node', s:path . '/../bin/start.js'], {
+		\ 'on_stderr': function('s:startHandler'),
+		\ 'on_exit': function('s:exitHandler')
 		\ })
-	let s:job_names[s:server_id] = 'Server start'
+	let s:job_names[g:tss_server_id] = 'Server start'
 endfunction
 
+" Stop the instance of tsserver running for the current TS project
 function! tss#stop()
 	" Don't try to stop the server if it's not running
-	if !s:server_id 
+	if !g:tss_server_id 
 		return 
 	endif
 
 	echom('Stopping server')
 	let job = jobstart(['node', s:path . '/../bin/stop.js'], {
-		\ 'on_stderr': function('s:LogHandler'),
-		\ 'on_exit': function('s:ExitHandler')
+		\ 'on_stderr': function('s:logHandler'),
+		\ 'on_exit': function('s:exitHandler')
 		\ })
-	let s:server_id = 0
 	let s:job_names[job] = 'Server stop'
 endfunction 
 
-function! s:ExitHandler(job_id, code)
+" Handle exit messages from async jobs
+function! s:exitHandler(job_id, code)
 	if a:code 
 		call tss#error(s:job_names[a:job_id] . ' failed: ' . a:code)
 	endif
 
 	call tss#debug(s:job_names[a:job_id] . ' ended')
 
-	if a:job_id == s:server_id
+	if a:job_id == g:tss_server_id
 		" If the server job died, clear the server ID field
-		let s:server_id = 0
-		let s:started = 0
+		let g:tss_server_id = 0
+		let s:ready = 0
 	endif
 endfunction
 
-function! s:Destinations(lines)
-	if len(a:lines) == 0
-		return 
-	endif 
-
-	let destinations = []
-
-	for line in a:lines 
-		let parts = matchlist(line, '\([^(]\+\)(\(\d\+\),\(\d\+\)): \(.*\)')
-		if len(parts) == 0
-			call tss#debug('Invalid destination line: "' . a:lines[0] . '"')
-			continue
-		endif 
-
-		let destinations = add(destinations, {
-			\ 'filename': parts[1],
-			\ 'lnum': parts[2],
-			\ 'col': parts[3],
-			\ 'text': parts[4]
-			\ })
-	endfor
-
-	call setloclist(0, destinations)
-
-	ll 1
-endfunction 
-
-function! s:Format(lines)
+" Implement a list of formatting directives in the current window
+function! s:format(lines)
 	if len(a:lines) == 0
 		return
 	endif
@@ -174,33 +186,32 @@ function! s:Format(lines)
 
 		call tss#debug('Processing format line <<<' . line . '>>>')
 
-		let parts = matchlist(line, '\([^(]\+\)(\(\d\+\),\(\d\+\)\.\.\(\d\+\),\(\d\+\)): \(.*\)')
+		let parts = matchlist(line,
+			\ '\([^(]\+\)(\(\d\+\),\(\d\+\)\.\.\(\d\+\),\(\d\+\)): \(.*\)')
 		if len(parts) == 0
 			continue 
 		endif 
 
-		let startLine = parts[2]
-		let startOffset = parts[3]
+		let line = parts[2]
+		let offset = parts[3]
 		let endLine = parts[4]
 		let endOffset = parts[5]
 
+		" Delete the text from (line,offset)..(endLine,endOffset)
 		call cursor(endLine, endOffset)
 		:normal mk
-		call cursor(startLine, startOffset)
+		call cursor(line, offset)
 		:normal d`k
-		call tss#debug('Deleted text from (' . startLine . ',' . startOffset . ') to (' . endLine . ',' . endOffset . ')')
+		call tss#debug('Deleted text from (' . line . ',' . offset . ') to ('
+			\ . endLine . ',' . endOffset . ')')
 
+		" Paste the new content into the buffer at (line,offset)
 		call setreg('m', parts[6])
 		let @m = parts[6]
 		:normal "mP
-		call tss#debug('Inserted "' . parts[6] . '" at (' . startLine . ',' . startOffset . ')')
+		call tss#debug('Inserted "' . parts[6] . '" at (' . line . ',' .
+			\ offset . ')')
 	endfor
-
-	"Restore the ve setting
-	let &ve = oldve
-
-	" Restore the 'm' register
-	call setreg('m', tmp)
 
 	" Restore the mark if it previously existed, or delete it
 	if mark[0] == 'mark'
@@ -210,24 +221,28 @@ function! s:Format(lines)
 		:normal delmarks k
 	endif
 
-	" Restore the cursor position
+	"Restore other saved settings
+	let &ve = oldve
+	call setreg('m', tmp)
 	call winrestview(view)
 endfunction 
 
-function! s:LogHandler(job_id, data)
+" Display messages from a process
+function! s:logHandler(job_id, data)
 	call tss#debug('Log: ' . join(a:data))
 endfunction 
 
-function! s:StartHandler(job_id, data)
-	call s:LogHandler(a:job_id, a:data)
+" Handle tsserver startup messages
+function! s:startHandler(job_id, data)
+	call s:logHandler(a:job_id, a:data)
 
-	if s:started 
+	if s:ready 
 		return 
 	endif
 
 	let data = join(a:data)
 	if data =~ 'Listening on'
-		let s:started = 1
+		let s:ready = 1
 		call tss#debug('Server started')
 
 		" After the server starts, open the current file
@@ -237,3 +252,45 @@ function! s:StartHandler(job_id, data)
 		endif
 	endif
 endfunction
+
+" Notify tsserver that a file has new data
+function! s:reloadFile(file)
+	call tss#debug('Reloading ' . a:file)
+	call execute('w !node ' . shellescape(s:path . '/../bin/reload.js') . ' ' .
+		\ shellescape(a:file))
+endfunction
+
+" Populate the location list with {references, definitions, implementations}
+function! s:getLocations(type)
+	" Clear the loclist
+	call setloclist(0, [], 'r')
+
+	let file = expand('%')
+	let pos = getcurpos()
+
+	" Ensure tsserver view of file is up-to-date
+	call s:reloadFile(file);
+
+	call tss#debug('Finding ' . a:type)
+	let lines = systemlist('node ' . shellescape(s:path . '/../bin/' . a:type
+		\ . '.js') . ' ' . shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
+	call tss#debug('Got ' . len(lines) . ' lines')
+
+	for line in lines 
+		let parts = matchlist(line, '\([^(]\+\)(\(\d\+\),\(\d\+\)): \(.*\)')
+		if len(parts) == 0
+			call tss#debug('Invalid location line: "' . line . '"')
+			continue
+		endif 
+
+		call setloclist(0, [{
+			\ 'filename': parts[1],
+			\ 'lnum': parts[2],
+			\ 'col': parts[3],
+			\ 'text': parts[4]
+			\ }], 'a')
+	endfor
+
+	" Jump to the first item in the list
+	ll 1
+endfunction 

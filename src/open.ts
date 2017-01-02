@@ -1,12 +1,10 @@
-import { end, openFile } from './lib/client';
-import { die, error } from './lib/log';
-import parseArgs = require('minimist');
+/**
+ * Tell tsserver that a file is being edited
+ */
 
-const argv = parseArgs(process.argv.slice(2));
-const filename = argv._[0];
+import { end, openFile, parseFileArg } from './lib/client';
+import { error } from './lib/log';
 
-if (!filename) {
-	die('A file is required');
-}
+const file = parseFileArg();
 
-openFile(filename).catch(error).then(end);
+openFile(file).catch(error).then(end);

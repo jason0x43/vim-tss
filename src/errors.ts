@@ -1,36 +1,46 @@
 /**
- * Get syntax errors
+ * Print errors for a file. By default, this command will notify tsserver to
+ * reload the file before checking it for errors. A '-n' or '--no-reload'
+ * option may be specified *after* the filename to prevent this.
  */
 
-import { end, reloadFile, getSemanticDiagnostics, getSyntacticDiagnostics } from './lib/client';
-import { error, print } from './lib/log';
-import parseArgs = require('minimist');
+import {
+	FileLocation,
+	end,
+	getSemanticDiagnostics,
+	getSyntacticDiagnostics,
+	parseFileArg,
+	reloadFile
+} from './lib/client';
+import { error } from './lib/log';
+import { printFileLocation } from './lib/locate';
 
-const argv = parseArgs(process.argv.slice(2), {
-	boolean: [ 'reload' ],
-	alias: { 'reload': 'r' }
-});
+const file = parseFileArg('file [-n,--no-reload]');
 
-const filename = argv._[0];
-if (!filename) {
-	error('Filename is required');
-	process.exit(1);
+const arg3 = process.argv[3];
+const noReload = arg3 === '--no-reload' || arg3 === '-n';
+
+const promise = noReload ? Promise.resolve() : reloadFile(file);
+
+promise
+	.then(() => Promise.all([
+		getSyntacticDiagnostics(file),
+		getSemanticDiagnostics(file)
+	]))
+	.then(results => {
+		const diags = [].concat(...results);
+		return diags.map(toFileLocation);
+	})
+	.then(locations => locations.forEach(printFileLocation))
+	.catch(error)
+	.then(end);
+
+function toFileLocation(diag: protocol.Diagnostic) {
+	const loc: FileLocation = {
+		file,
+		line: diag.start.line,
+		offset: diag.start.offset,
+		text: `error TS${diag.code}: ${diag.text}`
+	};
+	return loc;
 }
-
-let hasErrors = false;
-let promise = argv['reload'] ? reloadFile(filename) : Promise.resolve();
-
-promise.then(() => {
-	return Promise.all([ getSyntacticDiagnostics(filename), getSemanticDiagnostics(filename) ]);
-}).then(allDiags => {
-	hasErrors = allDiags.some(diags => diags.length > 0);
-	allDiags.forEach(diags => {
-		diags.forEach(diag => {
-			print(`${filename}(${diag.start.line},${diag.start.offset}): error TS${diag.code}: ${diag.text}\n`);
-		});
-	});
-}).catch(error).then(end).then(() => {
-	if (hasErrors) {
-		process.exit(1);
-	}
-});

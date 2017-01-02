@@ -1,16 +1,15 @@
 /**
- * Get a symbol definition
+ * Print the location(s) of the symbol at a particular position in a file
  */
 
 import { parseArgs, printFileLocation, toFileLocations } from './lib/locate';
-import { end, definition, reloadFile } from './lib/client';
+import { end, definition } from './lib/client';
 import { error } from './lib/log';
 
-const { argv, fileLocation } = parseArgs();
-let promise: Promise<any> = argv['reload'] ? reloadFile(fileLocation.file) : Promise.resolve();
+const fileLocation = parseArgs();
 
-promise.then(() => definition(fileLocation))
-	.then(spans => toFileLocations(spans, argv['text']))
+definition(fileLocation)
+	.then(spans => toFileLocations(spans, true))
 	.then(locations => locations.forEach(printFileLocation))
 	.catch(error)
 	.then(end);

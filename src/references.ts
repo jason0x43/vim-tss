@@ -1,19 +1,26 @@
 /**
- * Get a list of references to the symbol at a given location
+ * Print the locations of references to the symbol at a given location in a
+ * file
  */
 
-import { parseArgs } from './lib/locate';
-import { end, references, reloadFile } from './lib/client';
-import { error, print } from './lib/log';
+import { parseArgs, printFileLocation } from './lib/locate';
+import { FileLocation, end, references } from './lib/client';
+import { error } from './lib/log';
 
-const { argv, fileLocation } = parseArgs();
-let promise: Promise<any> = argv['reload'] ? reloadFile(fileLocation.file) : Promise.resolve();
+const fileLocation = parseArgs();
 
-promise.then(() => references(fileLocation))
-	.then(response => {
-		response.refs.forEach((ref: protocol.ReferencesResponseItem) => {
-			print(`${ref.file}(${ref.start.line},${ref.start.offset}): ${ref.lineText}\n`);
-		});
-	})
+references(fileLocation)
+	.then(response => response.refs.map(toFileLocation))
+	.then(locations => locations.forEach(printFileLocation))
 	.catch(error)
 	.then(end);
+
+function toFileLocation(ref: protocol.ReferencesResponseItem) {
+	const loc: FileLocation = {
+		file: ref.file,
+		line: ref.start.line,
+		offset: ref.start.offset,
+		text: ref.lineText
+	};
+	return loc;
+}

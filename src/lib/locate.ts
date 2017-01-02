@@ -1,25 +1,23 @@
 import { FileLocation } from './client';
 import { die, print } from './log';
 import { readFile } from 'fs';
-import minParseArgs = require('minimist');
+import { basename } from 'path';
 
 export function parseArgs() {
-	const argv = minParseArgs(process.argv.slice(2), {
-		boolean: ['reload' ],
-		alias: { 'reload': 'r' }
-	});
+	const args = process.argv.slice(2);
 
-	if (argv._.length !== 3) {
-		die('Filename, line, and offset are required');
+	if (args.length !== 3) {
+		const command = basename(process.argv[1]);
+		die(`usage: ${command} filename line offset`);
 	}
 
 	const fileLocation: FileLocation = {
-		file: argv._[0],
-		line:  Number(argv._[1]),
-		offset: Number(argv._[2])
+		file: args[0],
+		line:  Number(args[1]),
+		offset: Number(args[2])
 	};
 
-	return { argv, fileLocation };
+	return fileLocation;
 }
 
 export function toFileLocations(spans: protocol.FileSpan[], loadText = true) {

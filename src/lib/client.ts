@@ -6,32 +6,33 @@ import { createConnection, Socket } from 'net';
 import { MessageHandler, send } from './messages';
 import { getProjectRoot, getSocketFile } from './connect';
 import { readFile } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
+import { die } from './log';
 
 export interface FileLocation extends protocol.Location {
 	file: string;
 	text?: string;
 }
 
-export function closeFile(filename: string) {
-	return connect(filename).then(() => {
+export function closeFile(file: string) {
+	return connect(file).then(() => {
 		const request: protocol.CloseRequest = {
 			seq: getSequence(),
 			type: 'request',
 			command: 'close',
-			arguments: { file: filename }
+			arguments: { file }
 		};
 		return sendRequest(request);
 	});
 }
 
-export function configure(filename: string = null) {
-	if (!filename) {
-		filename = join(getProjectRoot('.'), 'tsconfig.json');
+export function configure(file: string = null) {
+	if (!file) {
+		file = join(getProjectRoot('.'), 'tsconfig.json');
 	}
 
 	const formatOptions = new Promise((resolve, reject) => {
-		readFile(filename, (err, data) => {
+		readFile(file, (err, data) => {
 			if (err) {
 				reject(err);
 			}
@@ -99,9 +100,9 @@ export interface FileRange extends protocol.Location {
 	endOffset: number;
 }
 
-export function getFileExtent(filename: string) {
+export function getFileExtent(file: string) {
 	return new Promise<FileRange>((resolve, reject) => {
-		readFile(filename, (err, data) => {
+		readFile(file, (err, data) => {
 			if (err) {
 				reject(err);
 			}
@@ -114,8 +115,8 @@ export function getFileExtent(filename: string) {
 	});
 }
 
-export function format(filename: string, fileExtent?: FileRange | Promise<FileRange>) {
-	const range = fileExtent || getFileExtent(filename);
+export function format(file: string, fileExtent?: FileRange | Promise<FileRange>) {
+	const range = fileExtent || getFileExtent(file);
 
 	return Promise.all([ range, connect() ]).then(results => {
 		const [ range ] = results;
@@ -128,7 +129,7 @@ export function format(filename: string, fileExtent?: FileRange | Promise<FileRa
 				offset: range.offset,
 				endLine: range.endLine,
 				endOffset: range.endOffset,
-				file: filename
+				file
 			}
 		};
 		return sendRequest<protocol.CodeEdit[]>(request, (response, resolve) => {
@@ -137,13 +138,13 @@ export function format(filename: string, fileExtent?: FileRange | Promise<FileRa
 	});
 }
 
-export function getSemanticDiagnostics(filename: string) {
-	return connect(filename).then(() => {
+export function getSemanticDiagnostics(file: string) {
+	return connect(file).then(() => {
 		const request: protocol.SemanticDiagnosticsSyncRequest = {
 			seq: getSequence(),
 			type: 'request',
 			command: 'semanticDiagnosticsSync',
-			arguments: { file: filename }
+			arguments: { file }
 		};
 		return sendRequest<protocol.Diagnostic[]>(request, (response, resolve) => {
 			resolve(response.body);
@@ -151,13 +152,13 @@ export function getSemanticDiagnostics(filename: string) {
 	});
 }
 
-export function getSyntacticDiagnostics(filename: string) {
-	return connect(filename).then(() => {
+export function getSyntacticDiagnostics(file: string) {
+	return connect(file).then(() => {
 		const request: protocol.SyntacticDiagnosticsSyncRequest = {
 			seq: getSequence(),
 			type: 'request',
 			command: 'syntacticDiagnosticsSync',
-			arguments: { file: filename }
+			arguments: { file }
 		};
 		return sendRequest<protocol.Diagnostic[]>(request, (response, resolve) => {
 			resolve(response.body);
@@ -179,16 +180,46 @@ export function implementation(fileLocation: FileLocation) {
 	});
 }
 
-export function openFile(filename: string) {
-	return connect(filename).then(() => {
+export function info(file: string) {
+	return connect().then(() => {
+		const request: protocol.ProjectInfoRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'projectInfo',
+			arguments: {
+				file,
+				needFileNameList: false
+			}
+		};
+		return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
+			resolve(response.body);
+		});
+	});
+}
+
+export function openFile(file: string, data?: string) {
+	return connect(file).then(() => {
+		const args: protocol.OpenRequestArgs = { file };
+		if (data != null) {
+			args.fileContent = data;
+		}
 		const request: protocol.OpenRequest = {
 			seq: getSequence(),
 			type: 'request',
 			command: 'open',
-			arguments: { file: filename }
+			arguments: args
 		};
 		return sendRequest(request).then(end);
 	});
+}
+
+export function parseFileArg(args?: string) {
+	const file = process.argv[2];
+	if (!file) {
+		const command = basename(process.argv[1]);
+		die(`usage: ${command} ${args || 'file'}`);
+	}
+	return file;
 }
 
 export function references(fileLocation: FileLocation) {
@@ -218,15 +249,15 @@ export function registerLogger() {
 	});
 }
 
-export function reloadFile(filename: string, tmpfile?: string) {
-	return connect(filename).then(() => {
+export function reloadFile(file: string, tmpfile?: string) {
+	return connect(file).then(() => {
 		const request: protocol.ReloadRequest = {
 			seq: getSequence(),
 			type: 'request',
 			command: 'reload',
 			arguments: {
-				file: filename,
-				tmpfile: tmpfile || filename
+				file,
+				tmpfile: tmpfile || file
 			}
 		};
 		return sendRequest<void>(request, (response, resolve) => {
@@ -250,14 +281,14 @@ const newline = 10;
 let client: Socket;
 let connected: Promise<Socket>;
 
-function connect(filename?: string) {
+function connect(file?: string) {
 	if (!connected) {
-		if (!filename) {
-			filename = process.cwd();
+		if (!file) {
+			file = process.cwd();
 		}
 
 		connected = new Promise<Socket>(resolve => {
-			client = createConnection(getSocketFile(filename), () => {
+			client = createConnection(getSocketFile(file), () => {
 				resolve(client);
 			});
 

@@ -1,5 +1,5 @@
 /**
- * Tsserver proxy
+ * Start a tsserver proxy that will manage a running instance of tsserver
  */
 
 import { ChildProcess, execSync, spawn } from 'child_process';

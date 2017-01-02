@@ -1,41 +1,32 @@
 /**
- * Get formatting hints
+ * Get formatting hints for a file based on the currently configured options in
+ * tsserver. See the `config` command.
  */
 
-import { end, format, FileRange, reloadFile } from './lib/client';
+import { end, format, FileRange, parseFileArg } from './lib/client';
 import { debug, error, print } from './lib/log';
-import parseArgs = require('minimist');
 
-const argv = parseArgs(process.argv.slice(2), {
-	boolean: [ 'reload' ],
-	alias: { 'reload': 'r' }
-});
+const file = parseFileArg('file [line offset endLine endOffset]');
 
-const filename = argv._[0];
-if (!filename) {
-	error('Filename is required');
-	process.exit(1);
-}
-
+const args = process.argv.slice(3);
 let range: FileRange;
-
-if (argv._.length >= 5) {
-	const line = Number(argv._[1]);
-	const offset = Number(argv._[2]);
-	const endLine = Number(argv._[3]);
-	const endOffset = Number(argv._[4]);
+if (args.length >= 4) {
+	const line = Number(args[0]);
+	const offset = Number(args[1]);
+	const endLine = Number(args[2]);
+	const endOffset = Number(args[3]);
 	range = { line, offset, endLine, endOffset };
 }
 
-let promise = argv['reload'] ? reloadFile(filename) : Promise.resolve();
-
-promise.then(() => {
-	return format(filename, range);
-}).then(edits => {
-	debug(`Got edits`);
-	edits.slice().reverse().forEach(edit => {
-		print(`${filename}(${edit.start.line},${edit.start.offset}..${edit.end.line},${edit.end.offset}): ${edit.newText}\n`);
-	});
-})
-.catch(error)
-.then(end);
+format(file, range)
+	.then(edits => {
+		debug(`Got edits`);
+		// Reverse the list of edits so that they're printed in the order in
+		// which they should be applied.
+		edits.slice().reverse().forEach(edit => {
+			print(`${file}(${edit.start.line},${edit.start.offset}..` +
+				`${edit.end.line},${edit.end.offset}): ${edit.newText}\n`);
+		});
+	})
+	.catch(error)
+	.then(end);
