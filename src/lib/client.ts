@@ -4,9 +4,9 @@
 
 import { createConnection, Socket } from 'net';
 import { MessageHandler, send } from './messages';
-import { getProjectRoot, getSocketFile } from './connect';
+import { getProjectConfig, getSocketFile } from './connect';
 import { readFile } from 'fs';
-import { basename, join } from 'path';
+import { basename } from 'path';
 import { die } from './log';
 
 export interface FileLocation extends protocol.Location {
@@ -28,7 +28,7 @@ export function closeFile(file: string) {
 
 export function configure(file: string = null) {
 	if (!file) {
-		file = join(getProjectRoot('.'), 'tsconfig.json');
+		file = getProjectConfig('.');
 	}
 
 	const formatOptions = new Promise((resolve, reject) => {
