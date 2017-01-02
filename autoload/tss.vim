@@ -300,6 +300,11 @@ function! s:getLocations(type)
 		\ . '.js') . ' ' . shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
 	call tss#debug('Got ' . len(lines) . ' lines')
 
+	if lines[0] == 'No results'
+		echom('No results')
+		return
+	endif
+
 	for line in lines 
 		let parts = matchlist(line, '\([^(]\+\)(\(\d\+\),\(\d\+\)): \(.*\)')
 		if len(parts) == 0
