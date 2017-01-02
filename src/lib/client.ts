@@ -222,6 +222,20 @@ export function parseFileArg(args?: string) {
 	return file;
 }
 
+export function quickInfo(fileLocation: FileLocation) {
+	return connect().then(() => {
+		const request: protocol.QuickInfoRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'quickinfo',
+			arguments: fileLocation
+		};
+		return sendRequest<protocol.QuickInfoResponseBody>(request, (response, resolve) => {
+			resolve(response.body);
+		});
+	});
+}
+
 export function references(fileLocation: FileLocation) {
 	return connect().then(() => {
 		const request: protocol.ReferencesRequest = {

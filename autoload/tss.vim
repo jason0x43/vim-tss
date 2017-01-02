@@ -108,6 +108,21 @@ function! tss#openFile(file)
 	let s:job_names[job] = 'Open ' . a:file
 endfunction
 
+function! tss#quickinfo()
+	let file = expand('%')
+	let pos = getcurpos()
+
+	" Ensure tsserver view of file is up-to-date
+	call s:reloadFile(file)
+
+	call tss#debug('Getting quick info for ' . file)
+	let lines = systemlist('node ' .
+		\ shellescape(s:path . '/../bin/quickinfo.js') . ' ' .
+		\ shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
+
+	redraw | echo(join(lines, "\n"))
+endfunction
+
 " Populate the location list with references to the symbol at the current
 " cursor position
 function! tss#references()
