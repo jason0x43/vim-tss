@@ -12,6 +12,20 @@ function! tss#closeFile(file)
 	let s:job_names[job] = 'Close ' . a:file
 endfunction
 
+function! tss#completions(file, line, offset, ...)
+	let prefix = a:0 > 0 ? (' ' . shellescape(a:1)) : ''
+	let ignoreCase = g:tss_completion_ignore_case ? ' -i' : ''
+
+	" Ensure tsserver view of file is up-to-date
+	call s:reloadFile(a:file)
+	call tss#debug('Getting completions for ' . a:file)
+	let output = system('node ' .
+		\ shellescape(s:path . '/../bin/completions.js') . ignoreCase . ' ' .
+		\ shellescape(a:file) . ' ' . a:line . ' ' . a:offset . prefix)
+
+	return json_decode(output)
+endfunction
+
 " Log a debug message
 function! tss#debug(message)
 	if g:tss_verbose
@@ -96,6 +110,44 @@ endfunction
 " symbol at the current cursor position
 function! tss#implementation()
 	call s:getLocations('implementation')
+endfunction
+
+function! tss#omnicomplete(findstart, base)
+	let line = getline('.')
+	let pos = getcurpos()
+
+	let offset = pos[2]
+
+	" Search backwords for first "iskeyword" identifier
+	while offset > 0 && line[offset - 2] =~ "\\k"
+		let offset -= 1
+	endwhile
+
+	if a:findstart
+		return offset - 1
+	else
+		let file = expand('%')
+		let comps = tss#completions(file, pos[1], offset, a:base)
+
+		let enableMenu = stridx(&completeopt, 'menu') != -1
+		let baseLength = strlen(a:base)
+
+		if enableMenu
+			let entries = []
+
+			for comp in comps
+				call complete_add({ 'word': comp.name, 'menu': comp.kind })
+
+				if complete_check()
+					break
+				endif
+			endfor
+
+			return entries
+		else
+			return map(comps, 'v:val.name')
+		endif
+	endif
 endfunction
 
 " Notify tsserver that a file is being edited
@@ -323,3 +375,4 @@ function! s:getLocations(type)
 	" Jump to the first item in the list
 	ll 1
 endfunction 
+

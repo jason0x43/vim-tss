@@ -1,7 +1,12 @@
-import { FileLocation } from './client';
+import { FileLocation, CompletionLocation } from './client';
 import { die, print } from './log';
 import { readFile } from 'fs';
 import { basename } from 'path';
+
+export interface CompletionArgs {
+	location: CompletionLocation;
+	ignoreCase: boolean;
+}
 
 export function parseArgs() {
 	const args = process.argv.slice(2);
@@ -18,6 +23,35 @@ export function parseArgs() {
 	};
 
 	return fileLocation;
+}
+
+export function parseCompletionArgs() {
+	const args = process.argv.slice(2);
+
+	let ignoreCase = args[0] === '--ignore-case' || args[0] === '-i';
+
+	if (ignoreCase) {
+		args.shift();
+	}
+
+	if (args.length < 3) {
+		const command = basename(process.argv[1]);
+		die(`usage: ${command} [-i,--ignore-case] filename line offset [prefix...]`);
+	}
+
+	const location: CompletionLocation = {
+		file: args[0],
+		line:  Number(args[1]),
+		offset: Number(args[2]),
+		prefix: args.slice(3).join(' ')
+	};
+
+	const result: CompletionArgs = {
+		location,
+		ignoreCase
+	};
+
+	return result;
 }
 
 export function toFileLocations(spans: protocol.FileSpan[], loadText = true) {

@@ -14,6 +14,11 @@ export interface FileLocation extends protocol.Location {
 	text?: string;
 }
 
+export interface CompletionLocation extends protocol.Location {
+	file: string;
+	prefix?: string;
+}
+
 export function closeFile(file: string) {
 	return connect(file).then(() => {
 		const request: protocol.CloseRequest = {
@@ -23,6 +28,20 @@ export function closeFile(file: string) {
 			arguments: { file }
 		};
 		return sendRequest(request);
+	});
+}
+
+export function completions(location: CompletionLocation) {
+	return connect().then(() => {
+		const request: protocol.CompletionsRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'completions',
+			arguments: location
+		};
+		return sendRequest<protocol.CompletionEntry[]>(request, (response, resolve) => {
+			resolve(response.body);
+		});
 	});
 }
 

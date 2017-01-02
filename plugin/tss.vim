@@ -1,12 +1,11 @@
 " If non-zero, display debug messages
-if !exists('g:tss_verbose')
-	let g:tss_verbose = 0
-endif
+let g:tss_verbose = get(g:, 'tss_verbose', 0)
 
 " Automatically format code when saving
-if !exists('g:tss_format_on_save')
-	let g:tss_format_on_save = 0
-endif
+let g:tss_format_on_save = get(g:, 'tss_format_on_save', 0)
+
+" Ignore case in completions
+let g:tss_completion_ignore_case = get(g:, 'tss_completion_ignore_case', 0)
 
 augroup vimtss
 	autocmd!
