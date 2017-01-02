@@ -15,7 +15,7 @@ endfunction
 " Log a debug message
 function! tss#debug(message)
 	if g:tss_verbose
-		echom('TSS: ' . a:message)
+		call tss#debug('TSS: ' . a:message)
 	endif
 endfunction
 
@@ -133,7 +133,7 @@ function! tss#start()
 		let s:startup_file = expand('%')
 	endif
 
-	echom('Starting server for ' . s:startup_file)
+	call tss#debug('Starting server for ' . s:startup_file)
 	let g:tss_server_id = jobstart(['node', s:path . '/../bin/start.js'], {
 		\ 'on_stderr': function('s:startHandler'),
 		\ 'on_exit': function('s:exitHandler')
@@ -148,7 +148,7 @@ function! tss#stop()
 		return 
 	endif
 
-	echom('Stopping server')
+	call tss#debug('Stopping server')
 	let job = jobstart(['node', s:path . '/../bin/stop.js'], {
 		\ 'on_stderr': function('s:logHandler'),
 		\ 'on_exit': function('s:exitHandler')
@@ -256,7 +256,7 @@ function! s:startHandler(job_id, data)
 
 		" After the server starts, open the current file
 		if s:startup_file != ''
-			echom('Opening initial file ' . s:startup_file)
+			call tss#debug('Opening initial file ' . s:startup_file)
 			call tss#openFile(s:startup_file)
 		endif
 	endif
