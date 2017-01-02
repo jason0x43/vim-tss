@@ -278,7 +278,7 @@ function! s:getLocations(type)
 	let pos = getcurpos()
 
 	" Ensure tsserver view of file is up-to-date
-	call s:reloadFile(file);
+	call s:reloadFile(file)
 
 	call tss#debug('Finding ' . a:type)
 	let lines = systemlist('node ' . shellescape(s:path . '/../bin/' . a:type
