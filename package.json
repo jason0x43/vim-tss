@@ -9,7 +9,8 @@
   "name": "vim-ts",
   "repository": "https://github.com/jason0x43/vim-ts.git",
   "scripts": {
-    "install": "tsc"
+    "install": "tsc",
+    "build": "tsc"
   },
   "version": "0.1.0"
 }
