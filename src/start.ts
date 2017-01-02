@@ -18,6 +18,7 @@ function commandExists(command: string) {
 		return true;
 	}
 	catch (err) {
+		debug(`Error checking for command: ${err}`);
 		return false;
 	}
 }
@@ -29,6 +30,34 @@ function fileExists(filename: string) {
 	}
 	catch (err) {
 		return false;
+	}
+}
+
+function findServerBin() {
+	let serverBin = process.argv[2];
+	if (fileExists(serverBin)) {
+		return serverBin;
+	}
+
+	// Try project
+	serverBin = join('node_modules', '.bin', 'tsserver');
+	debug(`Trying local tsserver at ${serverBin}`);
+	if (fileExists(serverBin)) {
+		return serverBin;
+	}
+
+	// Try global
+	serverBin = 'tsserver';
+	debug('Trying global tsserver');
+	if (!commandExists(serverBin)) {
+		return serverBin;
+	}
+
+	// Try plugin
+	serverBin = join(__dirname, '..', 'node_modules', '.bin', 'tsserver');
+	debug(`Trying plugin tsserver at ${serverBin}`);
+	if (fileExists(serverBin)) {
+		return serverBin;
 	}
 }
 
@@ -90,28 +119,10 @@ let exiting = false;
 let alreadyRunning = false;
 let tsserver: ChildProcess;
 
-let serverBin = process.argv[2];
-
+const serverBin = findServerBin();
 if (!serverBin) {
-	if (!fileExists(serverBin)) {
-		// Try project
-		serverBin = join('node_modules', '.bin', 'tsserver');
-	}
-
-	if (!fileExists(serverBin)) {
-		// Try global
-		serverBin = 'tsserver';
-	}
-
-	if (!commandExists(serverBin)) {
-		// Try plugin
-		serverBin = join(__dirname, '..', 'node_modules', '.bin', 'tsserver');
-	}
-
-	if (!fileExists(serverBin)) {
-		error(`Couldn't find a copy of tsserver`);
-		process.exit(1);
-	}
+	error(`Couldn't find a copy of tsserver`);
+	process.exit(1);
 }
 
 const socketFile = getSocketFile(process.cwd());
