@@ -5,6 +5,10 @@ let s:job_names = {}
 
 " Notify tsserver that a file is no longer being edited
 function! tss#closeFile(file)
+	if &filetype == 'javascript' && !g:tss_js 
+		return 
+	endif
+
 	call tss#debug('Closing ' . a:file)
 	let job = jobstart(['node', s:path . '/../bin/close.js', a:file], {
 		\ 'on_exit': function('s:exitHandler')
@@ -113,6 +117,24 @@ function! tss#implementation()
 	call s:getLocations('implementation')
 endfunction
 
+" Initialze the plugin for a new buffer
+function! tss#init()
+	command! -buffer TssDefinition :call tss#definition()
+	command! -buffer TssErrors :call tss#errors()
+	command! -buffer TssFormat :call tss#format()
+	command! -buffer TssImplementation :call tss#implementation()
+	command! -buffer TssQuickInfo :call tss#quickinfo()
+	command! -buffer TssReferences :call tss#references()
+	command! -buffer TssStart :call tss#start()
+	command! -buffer TssStop :call tss#stop()
+
+	setlocal omnifunc=tss#omnicomplete
+
+	if !g:tss_server_id
+		call tss#start()
+	endif
+endfunction
+
 " Return a list of omnicompletion entries for the current cursor position
 function! tss#omnicomplete(findstart, base)
 	let line = getline('.')
@@ -154,6 +176,10 @@ endfunction
 
 " Notify tsserver that a file is being edited
 function! tss#openFile(file)
+	if &filetype == 'javascript' && !g:tss_js 
+		return 
+	endif
+
 	call tss#debug('Opening ' . a:file)
 	let job = jobstart(['node', s:path . '/../bin/open.js', a:file], {
 		\ 'on_stderr': function('s:logHandler'),
@@ -185,6 +211,10 @@ endfunction
 
 " Called before saving a TS file
 function! tss#preSave()
+	if &filetype == 'javascript' && !g:tss_js 
+		return 
+	endif
+
 	if g:tss_format_on_save 
 		call tss#format()
 	endif
