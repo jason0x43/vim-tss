@@ -205,12 +205,14 @@ function! s:format(lines)
 		call tss#debug('Deleted text from (' . line . ',' . offset . ') to ('
 			\ . endLine . ',' . endOffset . ')')
 
-		" Paste the new content into the buffer at (line,offset)
-		call setreg('m', parts[6])
-		let @m = parts[6]
-		:normal "mP
-		call tss#debug('Inserted "' . parts[6] . '" at (' . line . ',' .
-			\ offset . ')')
+		" If there's new content, paste it into the buffer
+		if parts[6] != ''
+			call setreg('m', parts[6])
+			let @m = parts[6]
+			:normal "mP
+			call tss#debug('Inserted "' . parts[6] . '" at (' . line . ',' .
+				\ offset . ')')
+		endif
 	endfor
 
 	" Restore the mark if it previously existed, or delete it
