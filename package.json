@@ -3,6 +3,7 @@
   "description": "Vim plugin for using TypeScript Services",
   "devDependencies": {
     "@types/node": "~6.0.0",
+    "tslint": "~4.2.0",
     "typescript": "~2.1.0"
   },
   "license": "MIT",

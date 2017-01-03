@@ -3,7 +3,7 @@
  */
 
 import { CompletionLocation, completions, end } from './lib/client';
-import { die, error, print } from './lib/log';
+import { die, print } from './lib/log';
 import { basename } from 'path';
 
 const args = process.argv.slice(2);
@@ -36,6 +36,23 @@ completions(location)
 			else if (a.sortText > b.sortText) {
 				return 1;
 			}
+			else {
+				let nameA = a.name;
+				let nameB = b.name;
+
+				if (ignoreCase) {
+					nameA = nameA.toLowerCase();
+					nameB = nameB.toLowerCase();
+				}
+
+				if (nameA < nameB) {
+					return -1;
+				}
+				else if (nameA > nameB) {
+					return 1;
+				}
+			}
+
 			return 0;
 		});
 
@@ -50,7 +67,19 @@ completions(location)
 					entry.name.indexOf(prefix) === 0);
 			}
 		}
-		print(`${JSON.stringify(entries, null, '  ')}\n`);
+
+		return {
+			success: true,
+			body: entries
+		};
 	})
-	.catch(error)
+	.catch(e => {
+		return {
+			success: false,
+			message: e.message
+		};
+	})
+	.then(response => {
+		return print(`${JSON.stringify(response, null, '  ')}\n`);
+	})
 	.then(end);

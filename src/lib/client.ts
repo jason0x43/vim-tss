@@ -19,6 +19,27 @@ export interface CompletionLocation extends protocol.Location {
 	prefix?: string;
 }
 
+export class ProtocolError extends Error {
+	command: string;
+	requestSeq: number;
+
+	constructor(response: protocol.Response) {
+		const message = response.message || 'Request was not successful';
+
+		super(message);
+		Object.setPrototypeOf(this, ProtocolError.prototype);
+
+		if (Error.captureStackTrace) {
+			Error.captureStackTrace(this, ProtocolError);
+		}
+
+		this.name = (<any> this).constructor.name;
+		this.message = message;
+		this.command = response.command;
+		this.requestSeq = response.request_seq;
+	}
+}
+
 export function closeFile(file: string) {
 	return connect(file).then(() => {
 		const request: protocol.CloseRequest = {
@@ -356,7 +377,7 @@ function sendRequest<T>(request: protocol.Request, callback?: RequestCallback<T>
 		const promise = new Promise<T>((resolve, reject) => {
 			handler.on('response', response => {
 				if (response.success === false) {
-					reject(new Error('Request was not successful'));
+					reject(new ProtocolError(response));
 				}
 				else if (response.request_seq === request.seq) {
 					callback(response, resolve, reject);
