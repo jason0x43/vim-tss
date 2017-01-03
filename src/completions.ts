@@ -2,16 +2,32 @@
  * Print the quick info of the symbol at a particular position in a file
  */
 
-import { parseCompletionArgs } from './lib/locate';
-import { end, completions } from './lib/client';
-import { print, error } from './lib/log';
+import { CompletionLocation, completions, end } from './lib/client';
+import { die, error, print } from './lib/log';
+import { basename } from 'path';
 
-const args = parseCompletionArgs();
+const args = process.argv.slice(2);
 
-const ignoreCase = args.ignoreCase;
-const prefix = args.location.prefix;
+const ignoreCase = args[0] === '--ignore-case' || args[0] === '-i';
 
-completions(args.location)
+if (ignoreCase) {
+	args.shift();
+}
+
+if (args.length < 3) {
+	const command = basename(process.argv[1]);
+	die(`usage: ${command} [-i,--ignore-case] filename line offset `
+		+ '[prefix...]');
+}
+
+const location: CompletionLocation = {
+	file: args[0],
+	line:  Number(args[1]),
+	offset: Number(args[2]),
+	prefix: args.slice(3).join(' ')
+};
+
+completions(location)
 	.then(entries => {
 		entries.sort((a, b) => {
 			if (a.sortText < b.sortText) {
@@ -22,20 +38,19 @@ completions(args.location)
 			}
 			return 0;
 		});
+
+		const prefix = location.prefix;
 		if (prefix) {
 			if (ignoreCase) {
 				const regex = new RegExp(`^${prefix}`, 'i');
-				entries = entries.filter(entry => {
-					return regex.test(entry.name);
-				});
+				entries = entries.filter(entry => regex.test(entry.name));
 			}
 			else {
-				entries = entries.filter(entry => {
-					return entry.name.indexOf(prefix) === 0;
-				});
+				entries = entries.filter(entry =>
+					entry.name.indexOf(prefix) === 0);
 			}
 		}
-		print(JSON.stringify(entries));
+		print(`${JSON.stringify(entries, null, '  ')}\n`);
 	})
 	.catch(error)
 	.then(end);

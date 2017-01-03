@@ -18,6 +18,7 @@ function! tss#completions(file, line, offset, ...)
 
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(a:file)
+
 	call tss#debug('Getting completions for ' . a:file)
 	let output = system('node ' .
 		\ shellescape(s:path . '/../bin/completions.js') . ignoreCase . ' ' .
@@ -112,13 +113,14 @@ function! tss#implementation()
 	call s:getLocations('implementation')
 endfunction
 
+" Return a list of omnicompletion entries for the current cursor position
 function! tss#omnicomplete(findstart, base)
 	let line = getline('.')
 	let pos = getcurpos()
 
 	let offset = pos[2]
 
-	" Search backwords for first "iskeyword" identifier
+	" Search backwards for first "iskeyword" identifier
 	while offset > 0 && line[offset - 2] =~ "\\k"
 		let offset -= 1
 	endwhile

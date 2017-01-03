@@ -7,6 +7,8 @@ command! -buffer TssReferences :call tss#references()
 command! -buffer TssStart :call tss#start()
 command! -buffer TssStop :call tss#stop()
 
+setlocal omnifunc=tss#omnicomplete
+
 " Replace the default neomake tsc maker; this will only have an effect if
 " neomake is installed.
 let g:neomake_typescript_tsc_maker = {
