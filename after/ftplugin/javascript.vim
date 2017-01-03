@@ -4,7 +4,7 @@ endif
 
 let g:neomake_javascript_tss_maker = {
 		\ 'exe': 'node',
-		\ 'args': [expand('<sfile>:p:h') . '/../bin/errors.js'],
+		\ 'args': [expand('<sfile>:p:h') . '/../../bin/errors.js'],
         \ 'errorformat':
             \ '%E%f %#(%l\,%c): error TS%n: %m,' .
             \ '%C%\s%\+%m'
