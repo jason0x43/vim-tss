@@ -15,7 +15,7 @@ export function die(...args: any[]) {
 }
 
 export function error(...args: any[]) {
-	return log(...args);
+	return log('Error:', ...args);
 }
 
 export function log(...args: any[]) {
