@@ -25,7 +25,7 @@ The plugin will try to use `tsserver` from various locations in the following or
 Usage
 -----
 
-Currently the plugin is intended to quickly show build errors via Neomake, and for that purpose it should work out-of-the-box.
+See [the vimdoc](doc/vim-tss.txt)
 
 Architecture
 ------------

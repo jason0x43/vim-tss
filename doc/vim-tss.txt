@@ -1,0 +1,80 @@
+*vim-tss.txt* TypeScript language services integration for Neovim
+
+==============================================================================
+CONTENTS                                                    *vim-tss-contents*
+
+    1. Introduction ............................... |vim-tss-introduction|
+    2. Commands ....................................... |vim-tss-commands|
+    3. Configuration ............................. |vim-tss-configuration|
+
+==============================================================================
+1. Introduction                                         *vim-tss-introduction*
+
+This plugin provides a means for starting an instance of tsserver and
+interacting with it via command line scripts. This allows Vim to make use of
+the efficiency gains of tsserver without requiring complex Vim scripts. The
+only use case currently implemented is showing errors via Neomake.
+
+==============================================================================
+2. Commands                                                 *vim-tss-commands*
+
+                                                              *:TssDefinition*
+:TssDefinition          Get the definition for the symbol under the cursor.
+
+                                                                  *:TssErrors*
+:TssErrors              Get errors for the current file. If any errors exist,
+                        the quickfix window will be displayed.
+
+                                                                  *:TssFormat*
+:TssFormat              Format the current file. Formatting options my be
+                        set in a "formatCodeOptions" property in the project
+                        tsconfig.json or jsconfig.json file.
+
+                                                          *:TssImplementation*
+:TssImplementation      Get locations where the symbol under the cursor is
+                        implemented and jump to the first one. The buffer's
+                        location list will be populated with the locations.
+
+                                                               *:TssQuickInfo*
+:TssQuickInfo           Display summary information about the symbol under the
+                        cursor.
+
+                                                              *:TssReferences*
+:TssReferences          Get locations where the symbol under the cursor is
+                        referenced and jump to the first one. The buffer's
+                        location list will be populated with the locations.
+
+                                                                   *:TssStart*
+:TssStart               Start a tsserver instance for the project of the
+                        currently open file. This command has no effect if a
+                        server is already running.
+
+                                                                    *:TssStop*
+:TssStop                Stop the tsserver instance for the project of the
+                        currently open file.
+
+==============================================================================
+3. Configuration                                       *vim-tss-configuration*
+
+By default, the vim-tss will automatically start a tsserver instance when a
+TypeScript or JavaScript file is opened.
+
+Global Options                                               *vim-tss-options*
+
+*g:tss_verbose*                 If 1, debug messages will be logged.
+                              (default) 0
+
+*g:tss_js*                      If 1, JavaScript vim-tss will be enabled for
+                              JavaScript files.
+                              (default) 1
+
+*g:tss_format_on_save*          If 1, |:TssFormat| will be run on the current
+                              TypeScript file (or JavaScript file, if
+                              |g:tss_js|=1) every time a TypeScript file is
+                              saved.
+                              (default) 0
+
+*g:tss_completion_ignore_case*  If 1, ignore text case when finding completion
+                              matches.
+
+vim:et ft=help tw=78 isk+=<,>,\
