@@ -35,7 +35,7 @@ endfunction
 " Log a debug message
 function! tss#debug(...)
 	if g:tss_verbose
-		echom('TSS: ' . join(a:000, ' '))
+		echom 'TSS:' join(a:000, ' ')
 	endif
 endfunction
 
@@ -47,7 +47,7 @@ endfunction
 
 " Log an error message
 function! tss#error(message)
-	echoe('TSS: ' . a:message)
+	echohl WarningMsg | echo 'TSS:' a:message | echohl None
 endfunction
 
 " Populate the quickfix list with errors for the current buffer 
@@ -214,7 +214,7 @@ endfunction
 
 " Display a message
 function! tss#print(message)
-	echo(a:message)
+	echo a:message
 endfunction
 
 " Populate the location list with references to the symbol at the current
@@ -391,7 +391,7 @@ function! s:getLocations(type)
 	else
 		let message = get(response, 'message', string(response))
 		call tss#error('Error requesting locations: ' . message)
-		echom('No results')
+		echom 'No results'
 		return
 	endif
 endfunction 
