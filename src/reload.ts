@@ -8,23 +8,27 @@ import { debug, error } from './lib/log';
 
 const file = parseFileArg('file [tmpfile]');
 const tmpfile = process.argv[3];
-let data: string;
 
-process.stdin.on('readable', () => {
-	const buf = <Buffer>process.stdin.read();
-	if (buf == null) {
-		let promise: Promise<any>;
-		if (data != null) {
-			debug('Using data from stdin');
-			promise = openFile(file, data);
+const reader = new Promise<string>(resolve => {
+	let data: string;
+	process.stdin.on('readable', () => {
+		const buf = <Buffer>process.stdin.read();
+		if (buf == null) {
+			resolve(data);
 		}
 		else {
-			debug('Using file data');
-			promise = reloadFile(file, tmpfile);
+			data = (data || '') + buf.toString('utf8');
 		}
-		promise.catch(error).then(end);
+	});
+});
+
+reader.then(data => {
+	if (data != null) {
+		debug('Using data from stdin');
+		return openFile(file, data);
 	}
 	else {
-		data = (data || '') + buf.toString('utf8');
+		debug('Using file data');
+		return reloadFile(file, tmpfile);
 	}
-});
+}).catch(error).then(end);
