@@ -47,9 +47,7 @@ endfunction
 
 " Log an error message
 function! tss#error(message)
-	if g:tss_verbose
-		echoe('TSS: ' . a:message)
-	endif
+	echoe('TSS: ' . a:message)
 endfunction
 
 " Populate the quickfix list with errors for the current buffer 
