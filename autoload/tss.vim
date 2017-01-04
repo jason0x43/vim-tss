@@ -129,6 +129,7 @@ function! tss#omnicomplete(findstart, base)
 	else
 		let file = expand('%')
 		let response = tss#completions(file, pos[1], offset, a:base)
+		call tss#debug('Completion response:', response)
 
 		if get(response, 'success', 0)
 			let enableMenu = stridx(&completeopt, 'menu') != -1
@@ -148,7 +149,7 @@ function! tss#omnicomplete(findstart, base)
 			endif
 		else
 			let message = get(response, 'message', string(response))
-			call tss#debug('Error requesting completions: ' . message)
+			call tss#error('Error requesting completions: ' . message)
 			return []
 		endif
 	endif
@@ -210,6 +211,11 @@ function! tss#preSave()
 		call tss#format()
 	endif
 endfunction 
+
+" Display a message
+function! tss#print(message)
+	echo(a:message)
+endfunction
 
 " Populate the location list with references to the symbol at the current
 " cursor position
@@ -317,7 +323,8 @@ function! s:format(response)
 		call cursor(mark[5], mark[6])
 		:normal mk
 	else 
-		:normal delmarks k
+		call tss#debug('Deleting mark k')
+		delmarks k
 	endif
 
 	"Restore other saved settings
@@ -354,9 +361,9 @@ endfunction
 
 " Notify tsserver that a file has new data
 function! s:reloadFile(file)
-	call execute('w !node ' . shellescape(s:path . '/../bin/reload.js') . ' ' .
-		\ shellescape(a:file))
 	call tss#debug('Reloading', a:file)
+	call execute('w !node ' . shellescape(s:path . '/../bin/reload.js') . ' '
+		\ . shellescape(a:file))
 endfunction
 
 " Populate the location list with {references, definitions, implementations}

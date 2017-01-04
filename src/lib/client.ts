@@ -33,7 +33,7 @@ export class ProtocolError extends Error {
 			Error.captureStackTrace(this, ProtocolError);
 		}
 
-		this.name = (<any> this).constructor.name;
+		this.name = (<any>this).constructor.name;
 		this.message = message;
 		this.command = response.command;
 		this.requestSeq = response.request_seq;
@@ -83,8 +83,8 @@ export function configure(file: string = null) {
 		});
 	});
 
-	return Promise.all([ formatOptions, connect() ]).then(results => {
-		const [ formatOptions ] = results;
+	return Promise.all([formatOptions, connect()]).then(results => {
+		const [formatOptions] = results;
 		const request: protocol.ConfigureRequest = {
 			seq: getSequence(),
 			type: 'request',
@@ -163,8 +163,8 @@ export function failure(err: Error) {
 export function format(file: string, fileExtent?: FileRange | Promise<FileRange>) {
 	const range = fileExtent || getFileExtent(file);
 
-	return Promise.all([ range, connect() ]).then(results => {
-		const [ range ] = results;
+	return Promise.all([range, connect()]).then(results => {
+		const [range] = results;
 		const request: protocol.FormatRequest = {
 			seq: getSequence(),
 			type: 'request',
