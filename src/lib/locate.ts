@@ -1,5 +1,5 @@
 import { FileLocation } from './client';
-import { die, print } from './log';
+import { die } from './log';
 import { readFile } from 'fs';
 import { basename } from 'path';
 
@@ -67,12 +67,4 @@ export function toFileLocations(spans: protocol.FileSpan[], loadText = true) {
 			return allFileLocations.concat(fileLines);
 		}, []);
 	});
-}
-
-export function printFileLocation(loc: FileLocation) {
-	let message = `${loc.file}(${loc.line},${loc.offset})`;
-	if (loc.text) {
-		message += `: ${loc.text}`;
-	}
-	print(`${message}\n`);
 }

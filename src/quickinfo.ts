@@ -3,26 +3,11 @@
  */
 
 import { parseArgs } from './lib/locate';
-import { end, quickInfo } from './lib/client';
-import { debug, print } from './lib/log';
+import { end, failure, quickInfo, success } from './lib/client';
 
 const fileLocation = parseArgs();
 
 quickInfo(fileLocation)
-	.then(body => {
-		if (body.displayString) {
-			print(body.displayString);
-
-			if (body.documentation) {
-				print(`\n\n${body.documentation}`);
-			}
-		}
-		else {
-			print('There is no hint at the cursor.\n');
-		}
-	})
-	.catch(err => {
-		debug(err);
-		print('There is no hint at the cursor.\n');
-	})
+	.then(success)
+	.catch(failure)
 	.then(end);

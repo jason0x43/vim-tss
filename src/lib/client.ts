@@ -7,7 +7,7 @@ import { MessageHandler, send } from './messages';
 import { getProjectConfig, getSocketFile } from './connect';
 import { readFile } from 'fs';
 import { basename } from 'path';
-import { die } from './log';
+import { die, print } from './log';
 
 export interface FileLocation extends protocol.Location {
 	file: string;
@@ -155,6 +155,11 @@ export function getFileExtent(file: string) {
 	});
 }
 
+export function failure(err: Error) {
+	const response = { success: false, message: err.message };
+	return print(`${JSON.stringify(response, null, '  ')}\n`);
+}
+
 export function format(file: string, fileExtent?: FileRange | Promise<FileRange>) {
 	const range = fileExtent || getFileExtent(file);
 
@@ -274,6 +279,11 @@ export function quickInfo(fileLocation: FileLocation) {
 			resolve(response.body);
 		});
 	});
+}
+
+export function success(value: any) {
+	const response = { success: true, body: value };
+	return print(`${JSON.stringify(response, null, '  ')}\n`);
 }
 
 export function references(fileLocation: FileLocation) {

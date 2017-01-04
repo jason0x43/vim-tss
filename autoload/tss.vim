@@ -16,6 +16,7 @@ function! tss#closeFile(file)
 	let s:job_names[job] = 'Close ' . a:file
 endfunction
 
+" Get completions for the given file and offset
 function! tss#completions(file, line, offset, ...)
 	let prefix = a:0 > 0 ? (' ' . shellescape(a:1)) : ''
 	let ignoreCase = g:tss_completion_ignore_case ? ' -i' : ''
@@ -61,36 +62,14 @@ function! tss#errors()
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	call tss#debug('Getting errors for ' . file)
-	let lines = systemlist('node ' . shellescape(s:path . '/../bin/errors.js')
-		\ . ' ' . shellescape(file) . ' -n')
-	call tss#debug('Got ' . len(lines) . ' error lines')
+	call tss#debug('Getting errors for', file)
+	let output = system('node ' . shellescape(s:path . '/../bin/errors.js')
+		\ . ' ' . shellescape(file) . ' -n -j')
+	let response = json_decode(output)
+	call tss#debug('Got errors response:', response)
 
-	let current_err = {}
-
-	for line in lines
-		let parts = matchlist(line,
-			\ '\([^(]\+\)(\(\d\+\),\(\d\+\)): error \(.*\)')
-		if len(parts) > 0
-			if !empty(current_err)
-				" If we were filling in an error, it's done now, so add it to
-				" the list
-				call tss#debug('Added error to qflist')
-				call setqflist([current_err], 'a')
-			endif
-			let current_err = {
-				\ 'filename': parts[1],
-				\ 'lnum': parts[2],
-				\ 'col': parts[3],
-				\ 'text': parts[4]
-				\ }
-		else 
-			let current_err.text .= line
-		endif
-	endfor
-
-	if !empty(current_err)
-		call setqflist([current_err], 'a')
+	if get(response, 'success', 0)
+		call setqflist(s:toLoclistEntries(response.body), 'a')
 	endif
 
 	" Open or close the qf window as necessary
@@ -105,10 +84,10 @@ function! tss#format()
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	let lines = systemlist('node ' . shellescape(s:path . '/../bin/format.js')
 	call tss#debug('Formatting', file)
+	let output = system('node ' . shellescape(s:path . '/../bin/format.js')
 		\ . ' ' . shellescape(file))
-	call s:format(lines)
+	call s:format(json_decode(output))
 endfunction
 
 " Populate the location list with the locations of implementations of the
@@ -198,18 +177,29 @@ function! tss#quickinfo()
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	let lines = systemlist('node ' .
 	call tss#debug('Getting quick info for', file)
+	let output = system('node ' .
 		\ shellescape(s:path . '/../bin/quickinfo.js') . ' ' .
 		\ shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
 
-	redraw | echo(join(lines, "\n"))
-endfunction
+	let response = json_decode(output)
+	call tss#debug('Response:', response)
 
-" Populate the location list with references to the symbol at the current
-" cursor position
-function! tss#references()
-	call s:getLocations('references')
+	if get(response, 'success', 0)
+		redraw
+		call tss#debug('Successful response')
+		if get(response.body, 'displayString', '') != ''
+			call tss#print(response.body.displayString)
+			if get(response.body, 'documentation', '') != ''
+				call tss#print("\n" . response.body.documentation)
+			endif
+		else
+			call tss#print('No hint at the cursor')
+		endif
+	else
+		let message = get(response, 'message', string(response))
+		call tss#error('Error getting info: ' . message)
+	endif
 endfunction
 
 " Called before saving a TS file
@@ -222,6 +212,12 @@ function! tss#preSave()
 		call tss#format()
 	endif
 endfunction 
+
+" Populate the location list with references to the symbol at the current
+" cursor position
+function! tss#references()
+	call s:getLocations('references')
+endfunction
 
 " Start an instance of tsserver for the current TS project
 function! tss#start()
@@ -274,8 +270,10 @@ function! s:exitHandler(job_id, code)
 endfunction
 
 " Implement a list of formatting directives in the current window
-function! s:format(lines)
-	if len(a:lines) == 0
+function! s:format(response)
+	if !get(a:response, 'success', 0)
+		let message = get(a:response, 'message', string(response))
+		call tss#error('Error formatting: ' . message)
 		return
 	endif
 
@@ -288,23 +286,13 @@ function! s:format(lines)
 	" Allow selection to be one past EOL
 	set ve+=onemore
 
-	for line in a:lines
-		if line == ''
-			continue
-		endif
+	for entry in a:response.body
+		call tss#debug('Processing format entry', entry)
 
-		call tss#debug('Processing format line <<<' . line . '>>>')
-
-		let parts = matchlist(line,
-			\ '\([^(]\+\)(\(\d\+\),\(\d\+\)\.\.\(\d\+\),\(\d\+\)): \(.*\)')
-		if len(parts) == 0
-			continue 
-		endif 
-
-		let line = parts[2]
-		let offset = parts[3]
-		let endLine = parts[4]
-		let endOffset = parts[5]
+		let line = entry.start.line
+		let offset = entry.start.offset
+		let endLine = entry.end.line
+		let endOffset = entry.end.offset
 
 		" Delete the text from (line,offset)..(endLine,endOffset)
 		call cursor(endLine, endOffset)
@@ -315,17 +303,19 @@ function! s:format(lines)
 			\ . endLine . ',' . endOffset . ')')
 
 		" If there's new content, paste it into the buffer
-		if parts[6] != ''
-			call setreg('m', parts[6])
-			let @m = parts[6]
+		let newText = entry.newText
+		if entry.newText != ''
+			call setreg('m', newText)
+			let @m = newText
 			:normal "mP
-			call tss#debug('Inserted "' . parts[6] . '" at (' . line . ',' .
+			call tss#debug('Inserted "' . newText . '" at (' . line . ',' .
 				\ offset . ')')
 		endif
 	endfor
 
 	" Restore the mark if it previously existed, or delete it
 	if mark[0] == 'mark'
+		call tss#debug('Restoring mark', mark)
 		call cursor(mark[5], mark[6])
 		:normal mk
 	else 
@@ -382,32 +372,35 @@ function! s:getLocations(type)
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	let lines = systemlist('node ' . shellescape(s:path . '/../bin/' . a:type
 	call tss#debug('Finding', a:type)
+	let output = system('node ' . shellescape(s:path . '/../bin/' . a:type
 		\ . '.js') . ' ' . shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
-	call tss#debug('Got ' . len(lines) . ' lines')
+	call tss#debug('Got output:', output)
 
-	if lines[0] == 'No results'
+	let response = json_decode(output)
+	if get(response, 'success', 0)
+		call setloclist(0, s:toLoclistEntries(response.body), 'a')
+
+		" Jump to the first item in the list
+		ll 1
+	else
+		let message = get(response, 'message', string(response))
+		call tss#error('Error requesting locations: ' . message)
 		echom('No results')
 		return
 	endif
-
-	for line in lines 
-		let parts = matchlist(line, '\([^(]\+\)(\(\d\+\),\(\d\+\)): \(.*\)')
-		if len(parts) == 0
-			call tss#debug('Invalid location line: "' . line . '"')
-			continue
-		endif 
-
-		call setloclist(0, [{
-			\ 'filename': parts[1],
-			\ 'lnum': parts[2],
-			\ 'col': parts[3],
-			\ 'text': parts[4]
-			\ }], 'a')
-	endfor
-
-	" Jump to the first item in the list
-	ll 1
 endfunction 
 
+function! s:toLoclistEntries(locs)
+	let entries = []
+	for loc in a:locs
+		let entries = add(entries, {
+			\ 'filename': loc.file,
+			\ 'lnum': loc.line,
+			\ 'col': loc.offset,
+			\ 'text': loc.text
+			\ })
+	endfor
+	call tss#debug('Created loclist entries:', entries)
+	return entries
+endfunction

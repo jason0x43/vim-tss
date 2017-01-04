@@ -3,8 +3,14 @@
  * tsserver. See the `config` command.
  */
 
-import { end, format, FileRange, parseFileArg } from './lib/client';
-import { debug, error, print } from './lib/log';
+import {
+	end,
+	failure,
+	format,
+	FileRange,
+	parseFileArg,
+	success
+} from './lib/client';
 
 const file = parseFileArg('file [line offset endLine endOffset]');
 
@@ -20,13 +26,10 @@ if (args.length >= 4) {
 
 format(file, range)
 	.then(edits => {
-		debug(`Got edits`);
 		// Reverse the list of edits so that they're printed in the order in
 		// which they should be applied.
-		edits.slice().reverse().forEach(edit => {
-			print(`${file}(${edit.start.line},${edit.start.offset}..` +
-				`${edit.end.line},${edit.end.offset}): ${edit.newText}\n`);
-		});
+		return edits.slice().reverse();
 	})
-	.catch(error)
+	.then(success)
+	.catch(failure)
 	.then(end);

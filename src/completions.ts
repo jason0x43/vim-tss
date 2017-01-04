@@ -2,8 +2,8 @@
  * Print the quick info of the symbol at a particular position in a file
  */
 
-import { CompletionLocation, completions, end } from './lib/client';
-import { die, print } from './lib/log';
+import { CompletionLocation, completions, end, success, failure } from './lib/client';
+import { die } from './lib/log';
 import { basename } from 'path';
 
 const args = process.argv.slice(2);
@@ -68,18 +68,8 @@ completions(location)
 			}
 		}
 
-		return {
-			success: true,
-			body: entries
-		};
+		return entries;
 	})
-	.catch(e => {
-		return {
-			success: false,
-			message: e.message
-		};
-	})
-	.then(response => {
-		return print(`${JSON.stringify(response, null, '  ')}\n`);
-	})
+	.then(success)
+	.catch(failure)
 	.then(end);

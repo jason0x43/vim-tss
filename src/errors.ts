@@ -7,18 +7,31 @@
 import {
 	FileLocation,
 	end,
+	failure,
 	getSemanticDiagnostics,
 	getSyntacticDiagnostics,
 	parseFileArg,
-	reloadFile
+	reloadFile,
+	success
 } from './lib/client';
-import { error } from './lib/log';
-import { printFileLocation } from './lib/locate';
+import { print } from './lib/log';
 
-const file = parseFileArg('file [-n,--no-reload]');
+const file = parseFileArg('file [-n,--no-reload] [-j,--json]');
 
-const arg3 = process.argv[3];
-const noReload = arg3 === '--no-reload' || arg3 === '-n';
+let noReload = false;
+let printJson = false;
+process.argv.slice(3).forEach(arg => {
+	switch (arg) {
+	case '-n':
+	case '--no-reload':
+		noReload = true;
+		break;
+	case '-j':
+	case '--json':
+		printJson = true;
+		break;
+	}
+});
 
 const promise = noReload ? Promise.resolve() : reloadFile(file);
 
@@ -27,20 +40,24 @@ promise
 		getSyntacticDiagnostics(file),
 		getSemanticDiagnostics(file)
 	]))
-	.then(results => {
-		const diags = [].concat(...results);
-		return diags.map(toFileLocation);
+	.then(allDiags => [].concat(...allDiags).map(diag => {
+		const loc: FileLocation = {
+			file,
+			line: diag.start.line,
+			offset: diag.start.offset,
+			text: `error TS${diag.code}: ${diag.text}`
+		};
+		return loc;
+	}))
+	.then(locations => {
+		if (printJson) {
+			return success(locations);
+		}
+		else {
+			locations.forEach(loc => {
+				print(`${loc.file}(${loc.line},${loc.offset}): ${loc.text}\n`);
+			});
+		}
 	})
-	.then(locations => locations.forEach(printFileLocation))
-	.catch(error)
+	.catch(failure)
 	.then(end);
-
-function toFileLocation(diag: protocol.Diagnostic) {
-	const loc: FileLocation = {
-		file,
-		line: diag.start.line,
-		offset: diag.start.offset,
-		text: `error TS${diag.code}: ${diag.text}`
-	};
-	return loc;
-}
