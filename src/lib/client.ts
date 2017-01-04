@@ -351,8 +351,14 @@ function connect(file?: string) {
 			file = process.cwd();
 		}
 
-		connected = new Promise<Socket>(resolve => {
-			client = createConnection(getSocketFile(file), () => {
+		connected = new Promise<Socket>((resolve, reject) => {
+			const configFile = getProjectConfig(file);
+			if (!configFile) {
+				reject(new Error('No project config'));
+				return;
+			}
+
+			client = createConnection(getSocketFile(configFile), () => {
 				resolve(client);
 			});
 

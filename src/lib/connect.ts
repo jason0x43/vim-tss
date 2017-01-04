@@ -4,12 +4,6 @@ import { createHash } from 'crypto';
 import { readdirSync, statSync } from 'fs';
 import { debug } from './log';
 
-export function getSocketFile(fileOrDir: string) {
-	const hash = createHash('md5');
-	hash.update(getProjectConfig(fileOrDir));
-	return join(tmpdir(), `vim-tsserve.${hash.digest('hex')}.sock`);
-}
-
 export function getProjectConfig(fileOrDir: string): string {
 	debug(`Checking for config in ${fileOrDir}`);
 
@@ -29,8 +23,14 @@ export function getProjectConfig(fileOrDir: string): string {
 
 	if (dirname(path) === path) {
 		// We're at the filesystem root -- there's nowhere else to go
-		throw new Error('Could not find a tsconfig.json or jsconfig.json');
+		return null;
 	}
 
 	return getProjectConfig(dirname(path));
+}
+
+export function getSocketFile(configFile: string) {
+	const hash = createHash('md5');
+	hash.update(resolve(configFile));
+	return join(tmpdir(), `vim-tsserve.${hash.digest('hex')}.sock`);
 }

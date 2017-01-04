@@ -8,7 +8,7 @@ import { join } from 'path';
 import { statSync, unlink } from 'fs';
 import { debug, error, log, print } from './lib/log';
 import { MessageHandler } from './lib/messages';
-import { getSocketFile } from './lib/connect';
+import { getProjectConfig, getSocketFile } from './lib/connect';
 import { configure } from './lib/client';
 
 function commandExists(command: string) {
@@ -111,7 +111,9 @@ process.on('exit', () => {
 			tsserver.kill();
 		}
 		// Ensure socket file is removed when process exits
-		unlink(socketFile, _err => {});
+		if (socketFile) {
+			unlink(socketFile, _err => {});
+		}
 	}
 });
 
@@ -125,7 +127,13 @@ if (!serverBin) {
 	process.exit(1);
 }
 
-const socketFile = getSocketFile(process.cwd());
+const configFile = getProjectConfig(process.cwd());
+if (!configFile) {
+	error('Could not find a config file');
+	process.exit(1);
+}
+
+const socketFile = getSocketFile(configFile);
 const clients: Socket[] = [];
 const loggers: Socket[] = [];
 
