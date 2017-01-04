@@ -9,7 +9,7 @@ function! tss#closeFile(file)
 		return 
 	endif
 
-	call tss#debug('Closing ' . a:file)
+	call tss#debug('Closing', a:file)
 	let job = jobstart(['node', s:path . '/../bin/close.js', a:file], {
 		\ 'on_exit': function('s:exitHandler')
 		\ })
@@ -23,7 +23,7 @@ function! tss#completions(file, line, offset, ...)
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(a:file)
 
-	call tss#debug('Getting completions for ' . a:file)
+	call tss#debug('Getting completions for', a:file)
 	let output = system('node ' .
 		\ shellescape(s:path . '/../bin/completions.js') . ignoreCase . ' ' .
 		\ shellescape(a:file) . ' ' . a:line . ' ' . a:offset . prefix)
@@ -32,9 +32,9 @@ function! tss#completions(file, line, offset, ...)
 endfunction
 
 " Log a debug message
-function! tss#debug(message)
+function! tss#debug(...)
 	if g:tss_verbose
-		echom('TSS: ' . a:message)
+		echom('TSS: ' . join(a:000, ' '))
 	endif
 endfunction
 
@@ -105,8 +105,8 @@ function! tss#format()
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	call tss#debug('Formatting ' . file)
 	let lines = systemlist('node ' . shellescape(s:path . '/../bin/format.js')
+	call tss#debug('Formatting', file)
 		\ . ' ' . shellescape(file))
 	call s:format(lines)
 endfunction
@@ -183,7 +183,7 @@ function! tss#openFile(file)
 		return 
 	endif
 
-	call tss#debug('Opening ' . a:file)
+	call tss#debug('Opening', a:file)
 	let job = jobstart(['node', s:path . '/../bin/open.js', a:file], {
 		\ 'on_stderr': function('s:logHandler'),
 		\ 'on_exit': function('s:exitHandler')
@@ -198,8 +198,8 @@ function! tss#quickinfo()
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	call tss#debug('Getting quick info for ' . file)
 	let lines = systemlist('node ' .
+	call tss#debug('Getting quick info for', file)
 		\ shellescape(s:path . '/../bin/quickinfo.js') . ' ' .
 		\ shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
 
@@ -235,7 +235,7 @@ function! tss#start()
 		let s:startup_file = expand('%')
 	endif
 
-	call tss#debug('Starting server for ' . s:startup_file)
+	call tss#debug('Starting server for', s:startup_file)
 	let g:tss_server_id = jobstart(['node', s:path . '/../bin/start.js'], {
 		\ 'on_stderr': function('s:startHandler'),
 		\ 'on_exit': function('s:exitHandler')
@@ -264,7 +264,7 @@ function! s:exitHandler(job_id, code)
 		call tss#error(s:job_names[a:job_id] . ' failed: ' . a:code)
 	endif
 
-	call tss#debug(s:job_names[a:job_id] . ' ended')
+	call tss#debug(s:job_names[a:job_id], 'ended')
 
 	if a:job_id == g:tss_server_id
 		" If the server job died, clear the server ID field
@@ -340,7 +340,7 @@ endfunction
 
 " Display messages from a process
 function! s:logHandler(job_id, data)
-	call tss#debug('Log: ' . join(a:data))
+	call tss#debug('Log:', join(a:data))
 endfunction 
 
 " Handle tsserver startup messages
@@ -358,7 +358,7 @@ function! s:startHandler(job_id, data)
 
 		" After the server starts, open the current file
 		if s:startup_file != ''
-			call tss#debug('Opening initial file ' . s:startup_file)
+			call tss#debug('Opening initial file', s:startup_file)
 			call tss#openFile(s:startup_file)
 		endif
 	endif
@@ -366,9 +366,9 @@ endfunction
 
 " Notify tsserver that a file has new data
 function! s:reloadFile(file)
-	call tss#debug('Reloading ' . a:file)
 	call execute('w !node ' . shellescape(s:path . '/../bin/reload.js') . ' ' .
 		\ shellescape(a:file))
+	call tss#debug('Reloading', a:file)
 endfunction
 
 " Populate the location list with {references, definitions, implementations}
@@ -382,8 +382,8 @@ function! s:getLocations(type)
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	call tss#debug('Finding ' . a:type)
 	let lines = systemlist('node ' . shellescape(s:path . '/../bin/' . a:type
+	call tss#debug('Finding', a:type)
 		\ . '.js') . ' ' . shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
 	call tss#debug('Got ' . len(lines) . ' lines')
 
