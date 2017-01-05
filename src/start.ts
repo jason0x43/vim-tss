@@ -94,8 +94,8 @@ function startTsserver() {
 		clients.forEach(client => client.write(data));
 	});
 
-	tsserver.stderr.on('data', data => {
-		log(data);
+	tsserver.stderr.on('data', (data: Buffer) => {
+		log(data.toString('utf8'));
 	});
 
 	// configure the newly created server
