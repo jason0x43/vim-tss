@@ -19,14 +19,11 @@ endfunction
 " Get completions for the given file and offset
 function! tss#completions(file, line, offset, ...)
 	let prefix = a:0 > 0 ? (' ' . shellescape(a:1)) : ''
-	let ignoreCase = g:tss_completion_ignore_case ? ' -i' : ''
-
-	" Ensure tsserver view of file is up-to-date
-	call s:reloadFile(a:file)
+	let ignoreCase = g:tss_completion_ignore_case ? ' -i ' : ' '
 
 	call tss#debug('Getting completions for', a:file)
 	let output = system('node ' .
-		\ shellescape(s:path . '/../bin/completions.js') . ignoreCase . ' ' .
+		\ shellescape(s:path . '/../bin/completions.js') . ignoreCase .
 		\ shellescape(a:file) . ' ' . a:line . ' ' . a:offset . prefix)
 
 	return json_decode(output)
@@ -102,6 +99,11 @@ function! tss#init()
 	command! -buffer TssImplementation :call tss#implementation()
 	command! -buffer TssQuickInfo :call tss#quickinfo()
 	command! -buffer TssReferences :call tss#references()
+	command! -buffer TssReloadProjects :call tss#reloadProjects()
+	command! -buffer TssRename :call tss#rename()
+	command! -buffer TssRenameComments :call tss#rename({ 'comments': 1 })
+	command! -buffer TssRenameCommentsStrings :call tss#rename({ 'comments': 1, 'strings': 1 })
+	command! -buffer TssRenameStrings :call tss#rename({ 'strings': 1 })
 	command! -buffer TssStart :call tss#start()
 	command! -buffer TssStop :call tss#stop()
 
@@ -114,6 +116,7 @@ endfunction
 
 " Return a list of omnicompletion entries for the current cursor position
 function! tss#omnicomplete(findstart, base)
+	let file = expand('%')
 	let line = getline('.')
 	let pos = getcurpos()
 
@@ -125,9 +128,11 @@ function! tss#omnicomplete(findstart, base)
 	endwhile
 
 	if a:findstart
+		" Ensure tsserver view of file is up-to-date
+		call s:reloadFile(file)
+
 		return offset - 1
 	else
-		let file = expand('%')
 		let response = tss#completions(file, pos[1], offset, a:base)
 		call tss#debug('Completion response:', response)
 
@@ -201,6 +206,69 @@ function! tss#quickinfo()
 	endif
 endfunction
 
+" Reload project files in the tsserver instance
+function! tss#reloadProjects()
+	call tss#debug('Reloading projects')
+	call execute('!node ' . shellescape(s:path . '/../bin/reload-projects.js'))
+endfunction
+
+function! tss#rename(...)
+	let flags = ' '
+
+	if a:0 > 0 && type(a:1) == type({})
+		if get(a:1, 'comments', 0)
+			let flags = flags . '-c '
+		endif
+		if get(a:1, 'strings', 0)
+			let flags = flags . '-s '
+		endif
+	endif
+
+	let file = expand('%')
+	let pos = getcurpos()
+
+	" Ensure tsserver view of file is up-to-date
+	call s:reloadFile(file)
+
+	call tss#debug('Getting rename locations for ' . file)
+	let output = system('node ' .
+		\ shellescape(s:path . '/../bin/rename.js') . flags .
+		\ shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
+
+	let response = json_decode(output)
+	
+	if !get(response, 'success', 0)
+		redraw
+		let message = get(response, 'message', string(response))
+		call tss#error('Error getting rename locations: ' . message)
+		return
+	endif
+
+	let body = get(response, 'body', {})
+	let info = get(body, 'info', {})
+	let locs = get(body, 'locs', [])
+
+	if !get(info, 'canRename', 0)
+		redraw
+		let message = get(info, 'localizedErrorMessage', string(response))
+		call tss#error(message)
+		return
+	endif
+
+	echohl String
+	let symbol = input('New symbol name: ')
+	echohl None
+
+	if symbol !~ '^[A-Za-z_\$][A-Za-z_\$0-9]*$'
+		redraw
+		call tss#error('"' . symbol . '" is not a valid identifier')
+		return
+	endif
+
+	redraw | echom(symbol)
+	" TODO: process locations and change them
+endfunction
+
 " Called before saving a TS file
 function! tss#preSave()
 	if &filetype == 'javascript' && !g:tss_js 
@@ -235,8 +303,13 @@ function! tss#start()
 		let s:startup_file = expand('%')
 	endif
 
+	let cmd = ['node', s:path . '/../bin/start.js']
+	if g:tss_debug_tsserver
+		let cmd = add(cmd, '--debug-tsserver')
+	endif
+
 	call tss#debug('Starting server for', s:startup_file)
-	let g:tss_server_id = jobstart(['node', s:path . '/../bin/start.js'], {
+	let g:tss_server_id = jobstart(cmd, {
 		\ 'on_stderr': function('s:startHandler'),
 		\ 'on_exit': function('s:exitHandler')
 		\ })

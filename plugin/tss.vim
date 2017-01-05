@@ -1,6 +1,9 @@
 " If non-zero, display debug messages
 let g:tss_verbose = get(g:, 'tss_verbose', 0)
 
+" If non-zero, start tsserver in a node inspector session
+let g:tss_debug_tsserver = get(g:, 'tss_debug_tsserver', 0)
+
 " Use with JS files
 let g:tss_js = get(g:, 'tss_js', 1)
 

@@ -19,6 +19,12 @@ export interface CompletionLocation extends protocol.Location {
 	prefix?: string;
 }
 
+export interface RenameLocation extends protocol.Location {
+	file: string;
+	findInComments?: boolean;
+	findInStrings?: boolean;
+}
+
 export class ProtocolError extends Error {
 	command: string;
 	requestSeq: number;
@@ -258,6 +264,48 @@ export function openFile(file: string, data?: string) {
 	});
 }
 
+export function navBar(file: string) {
+	return connect().then(() => {
+		const request: protocol.NavBarRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'navbar',
+			arguments: { file }
+		};
+		return sendRequest<protocol.NavigationBarItem[]>(request, (response, resolve) => {
+			resolve(response.body);
+		});
+	});
+}
+
+export function navTo(args: protocol.NavtoRequestArgs) {
+	return connect().then(() => {
+		const request: protocol.NavtoRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'navto',
+			arguments: args
+		};
+		return sendRequest<protocol.NavtoItem[]>(request, (response, resolve) => {
+			resolve(response.body);
+		});
+	});
+}
+
+export function navTree(file: string) {
+	return connect().then(() => {
+		const request: protocol.NavTreeRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'navtree',
+			arguments: { file }
+		};
+		return sendRequest<protocol.NavTreeResponse>(request, (response, resolve) => {
+			resolve(response.body);
+		});
+	});
+}
+
 export function parseFileArg(args?: string) {
 	const file = process.argv[2];
 	if (!file) {
@@ -328,6 +376,60 @@ export function reloadFile(file: string, tmpfile?: string) {
 			if (response.body && response.body['reloadFinished']) {
 				resolve();
 			}
+		});
+	});
+}
+
+export function reloadProjects() {
+	return connect().then(() => {
+		const request: protocol.ReloadProjectsRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'reloadProjects'
+		};
+		// reloadProjects doesn't return anything
+		return send(client, request);
+	});
+}
+
+export function rename(location: RenameLocation) {
+	return connect().then(() => {
+		const request: protocol.RenameRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'rename',
+			arguments: location
+		};
+		return sendRequest<protocol.RenameResponse>(request, (response, resolve) => {
+			resolve(response.body);
+		});
+	});
+}
+
+export function signatureHelp(location: FileLocation) {
+	return connect().then(() => {
+		const request: protocol.SignatureHelpRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'signatureHelp',
+			arguments: location
+		};
+		return sendRequest<protocol.SignatureHelpResponse>(request, (response, resolve) => {
+			resolve(response.body);
+		});
+	});
+}
+
+export function typeDefinition(location: FileLocation) {
+	return connect().then(() => {
+		const request: protocol.TypeDefinitionRequest = {
+			seq: getSequence(),
+			type: 'request',
+			command: 'typeDefinition',
+			arguments: location
+		};
+		return sendRequest<protocol.TypeDefinitionResponse>(request, (response, resolve) => {
+			resolve(response.body);
 		});
 	});
 }

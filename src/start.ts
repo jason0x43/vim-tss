@@ -61,8 +61,15 @@ function findServerBin() {
 	}
 }
 
+let debugTsserver = process.argv[2] === '--debug-tsserver';
+
 function startTsserver() {
-	tsserver = spawn(serverBin);
+	if (debugTsserver) {
+		tsserver = spawn('node', ['--inspect', '--debug-brk', serverBin]);
+	}
+	else {
+		tsserver = spawn(serverBin);
+	}
 	log('Started tsserver');
 
 	// Pipe this process's stdin to the running tsserver's
