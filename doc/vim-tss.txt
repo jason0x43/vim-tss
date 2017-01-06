@@ -6,14 +6,16 @@ CONTENTS                                                    *vim-tss-contents*
     1. Introduction ............................... |vim-tss-introduction|
     2. Commands ....................................... |vim-tss-commands|
     3. Configuration ............................. |vim-tss-configuration|
+    4. Extras ........................................... |vim-tss-extras|
 
 ==============================================================================
 1. Introduction                                         *vim-tss-introduction*
 
 This plugin provides a means for starting an instance of tsserver and
-interacting with it via command line scripts. This allows Vim to make use of
-the efficiency gains of tsserver without requiring complex Vim scripts. The
-only use case currently implemented is showing errors via Neomake.
+interacting with it in Vim. Individual TS commands such as 'format' or
+'rename' are implemented as standalone command line scripts. This allows Vim
+to make use of the efficiency gains of tsserver without requiring complex Vim
+scripts.
 
 ==============================================================================
 2. Commands                                                 *vim-tss-commands*
@@ -96,5 +98,14 @@ Global Options                                               *vim-tss-options*
 
 *g:tss_verbose*                 If 1, debug messages will be logged.
                               (default) 0
+
+==============================================================================
+4. Extras                                                     *vim-tss-extras*
+
+The plugin overrides Neomake's default 'tsc' make for TypeScript files with one
+that uses the TS language services syntactic and semantic error commands. This
+allows Neomake to display errors almost instantaneously even for large
+projects. The plugin also sets up a 'tss' maker for JavaScript files and makes
+it and 'jshint' the default makers.
 
 vim:et ft=help tw=78 isk+=<,>,\
