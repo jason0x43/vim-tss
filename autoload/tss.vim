@@ -6,8 +6,8 @@ let s:open_files = {}
 
 " Notify tsserver that a file is no longer being edited
 function! tss#closeFile(file)
-	if &filetype == 'javascript' && !g:tss_js 
-		return 
+	if &filetype == 'javascript' && !g:tss_js
+		return
 	endif
 
 	if has_key(s:open_files, a:file)
@@ -27,7 +27,7 @@ function! tss#definition()
 	call s:getLocations('definition')
 endfunction
 
-" Populate the quickfix list with errors for the current buffer 
+" Populate the quickfix list with errors for the current buffer
 function! tss#errors()
 	" Clear the quickfix list
 	call setqflist([], 'r')
@@ -140,8 +140,8 @@ endfunction
 
 " Notify tsserver that a file is being edited
 function! tss#openFile(file)
-	if &filetype == 'javascript' && !g:tss_js 
-		return 
+	if &filetype == 'javascript' && !g:tss_js
+		return
 	endif
 
 	let s:open_files[a:file] = 1
@@ -188,14 +188,14 @@ endfunction
 
 " Called before saving a TS file
 function! tss#preSave()
-	if &filetype == 'javascript' && !g:tss_js 
-		return 
+	if &filetype == 'javascript' && !g:tss_js
+		return
 	endif
 
-	if g:tss_format_on_save 
+	if g:tss_format_on_save
 		call tss#format()
 	endif
-endfunction 
+endfunction
 
 " Populate the location list with references to the symbol at the current
 " cursor position
@@ -309,8 +309,8 @@ endfunction
 " Stop the instance of tsserver running for the current TS project
 function! tss#stop()
 	" Don't try to stop the server if it's not running
-	if !g:tss_server_id 
-		return 
+	if !g:tss_server_id
+		return
 	endif
 
 	call s:debug('Stopping server')
@@ -319,7 +319,7 @@ function! tss#stop()
 		\ 'on_exit': function('s:exitHandler')
 		\ })
 	let s:job_names[job] = 'Server stop'
-endfunction 
+endfunction
 
 " ----------------------------------------------------------------------------
 " Support functions
@@ -348,7 +348,7 @@ endfunction
 
 " Handle exit messages from async jobs
 function! s:exitHandler(job_id, code)
-	if a:code 
+	if a:code
 		call s:error(s:job_names[a:job_id] . ' failed: ' . a:code)
 	endif
 
@@ -416,7 +416,7 @@ function! s:format(response)
 		call s:debug('Restoring mark', mark)
 		call cursor(mark[5], mark[6])
 		:normal mk
-	else 
+	else
 		call s:debug('Deleting mark k')
 		delmarks k
 	endif
@@ -425,7 +425,7 @@ function! s:format(response)
 	let &ve = oldve
 	call setreg('m', tmp)
 	call winrestview(view)
-endfunction 
+endfunction
 
 " Populate the location list with {references, definitions, implementations}
 function! s:getLocations(type)
@@ -455,12 +455,12 @@ function! s:getLocations(type)
 		echom 'No results'
 		return
 	endif
-endfunction 
+endfunction
 
 " Display messages from a process
 function! s:logHandler(job_id, data)
 	call s:debug('Log:', join(a:data))
-endfunction 
+endfunction
 
 " Display a message
 function! s:print(message)
@@ -529,8 +529,8 @@ endfunction
 function! s:startHandler(job_id, data)
 	call s:logHandler(a:job_id, a:data)
 
-	if s:ready 
-		return 
+	if s:ready
+		return
 	endif
 
 	let data = join(a:data)
@@ -565,4 +565,3 @@ endfunction
 function! s:warn(message)
 	echohl WarningMsg | echo 'TSS:' a:message | echohl None
 endfunction
-
