@@ -400,7 +400,7 @@ export function rename(location: RenameLocation) {
 			command: 'rename',
 			arguments: location
 		};
-		return sendRequest<protocol.RenameResponse>(request, (response, resolve) => {
+		return sendRequest<protocol.RenameResponseBody>(request, (response, resolve) => {
 			resolve(response.body);
 		});
 	});

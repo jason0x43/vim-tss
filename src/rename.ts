@@ -43,18 +43,25 @@ const location: RenameLocation = {
 };
 
 interface RenameResult extends protocol.RenameResponseBody {
+	requested: protocol.TextSpan[];
 	spanMap: { [ key: string]: protocol.TextSpan[] };
 }
 
 rename(location)
 	.then(response => {
 		const result: RenameResult = {
+			requested: undefined,
 			spanMap: {},
-			...response.body
+			...response
 		};
 
-		response.body.locs.forEach(spanGroup => {
-			result.spanMap[spanGroup.file] = spanGroup.locs;
+		response.locs.forEach(spanGroup => {
+			if (spanGroup.file === location.file) {
+				result.requested = spanGroup.locs;
+			}
+			else {
+				result.spanMap[spanGroup.file] = spanGroup.locs;
+			}
 		});
 
 		return result;

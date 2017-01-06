@@ -246,7 +246,6 @@ function! tss#rename(...)
 
 	let body = get(response, 'body', {})
 	let info = get(body, 'info', {})
-	let locs = get(body, 'locs', [])
 
 	if !get(info, 'canRename', 0)
 		redraw
@@ -265,8 +264,15 @@ function! tss#rename(...)
 		return
 	endif
 
-	redraw | echom(symbol)
-	" TODO: process locations and change them
+	let locs = get(body, 'locs', [])
+	let fileLocs = get(body, 'requested', [])
+	let spanMap = get(body, 'spanMap', {})
+
+	call s:renameLocations(file, symbol, fileLocs)
+	" TODO: handle renames in other files
+	" for filename in keys(spanMap)
+	" 	call s:renameLocations(filename, symbol, spanMap[filename])
+	" endfor
 endfunction
 
 " Called before saving a TS file
@@ -481,4 +487,25 @@ function! s:toLoclistEntries(locs)
 	endfor
 	call tss#debug('Created loclist entries:', entries)
 	return entries
+endfunction
+
+function! s:renameLocations(file, symbol, locs)
+	for loc in a:locs
+		let start = loc.start
+		let end = loc.end
+
+		if start.line != end.line
+			" TODO: notify the user?
+			continue
+		endif
+
+		let line = getline(start.line)
+
+		let pre = start.offset == 1 ? '' : line[:(start.offset - 2)]
+		let post = line[(end.offset - 1):]
+
+		call setline(start.line, pre . a:symbol . post)
+	endfor
+
+	call s:reloadFile(a:file)
 endfunction
