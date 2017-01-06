@@ -10,7 +10,9 @@ function! tss#closeFile(file)
 		return 
 	endif
 
-	unlet s:open_files[a:file]
+	if has_key(s:open_files, a:file)
+		unlet s:open_files[a:file]
+	endif
 
 	call s:debug('Closing', a:file)
 	let job = jobstart(['node', s:path . '/../bin/close.js', a:file], {
