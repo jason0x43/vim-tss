@@ -78,11 +78,7 @@ function! tss#init()
 	command! -buffer TssQuickInfo :call tss#quickinfo()
 	command! -buffer TssReferences :call tss#references()
 	command! -buffer TssReloadProjects :call tss#reloadProjects()
-	command! -buffer TssRename :call tss#rename()
-	command! -buffer TssRenameComments :call tss#rename({ 'comments': 1 })
-	command! -buffer TssRenameCommentsStrings :call tss#rename(
-		\ { 'comments': 1, 'strings': 1 })
-	command! -buffer TssRenameStrings :call tss#rename({ 'strings': 1 })
+	command! -buffer -nargs=? TssRename :call tss#rename(<f-args>)
 	command! -buffer TssStart :call tss#start()
 	command! -buffer TssStop :call tss#stop()
 
@@ -216,13 +212,17 @@ endfunction
 " Rename a symbol in a project
 function! tss#rename(...)
 	let flags = ' '
+	let projectWide = 0
 
-	if a:0 > 0 && type(a:1) == type({})
-		if get(a:1, 'comments', 0)
+	if a:0 > 0
+		if a:1 =~ 'c'
 			let flags = flags . '-c '
 		endif
-		if get(a:1, 'strings', 0)
+		if a:1 =~ 's'
 			let flags = flags . '-s '
+		endif
+		if a:1 =~ 'p'
+			let projectWide = 1
 		endif
 	endif
 
@@ -274,6 +274,10 @@ function! tss#rename(...)
 
 	let allLocs = get(body, 'locs', [])
 	for locs in allLocs
+		if locs.file != file && !projectWide
+			call s:debug('Skipping file', locs.file)
+			continue
+		endif
 		call s:debug('Processing rename locs', locs)
 		call s:renameLocations(locs.file, symbol, locs.locs)
 	endfor
