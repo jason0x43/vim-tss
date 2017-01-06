@@ -489,18 +489,16 @@ function! s:reloadFiles()
 	call execute('buffer ' . buf)
 endfunction
 
-" Rename instances of a symbol in a file.
+" Rename instances of a symbol in a file
 function! s:renameLocations(file, symbol, locs)
 	call s:debug('Renaming', a:symbol, 'in', a:file, 'at', a:locs)
 
 	let originalFile = expand('%')
 	let originalPos = getcurpos()
-	let newFile = !has_key(s:open_files, a:file)
 
-	" Switch to the buffer of the file to be updated. Disable autocmds since
-	" we're just temporarily editing it.
+	" Switch to the buffer of the file to be updated
 	if a:file != originalFile
-		call execute('noautocmd edit ' . a:file)
+		call execute('edit ' . a:file)
 		call s:debug('Opened', a:file)
 	endif
 
@@ -521,22 +519,9 @@ function! s:renameLocations(file, symbol, locs)
 	endfor
 
 	if a:file != originalFile
-		if newFile
-			" If the file wasn't open to begin with, save it
-			noautocmd write
-			call s:debug('Saved', a:file)
-		endif
-
-		" Re-edit the original buffer. We do this before destroying the temp
-		" buffer to prevent vim from closing the window we were using.
+		" Switch back to the original buffer
 		call execute('buffer ' . originalFile)
 		call setpos('.', originalPos)
-
-		if newFile
-			" If the file wasn't open to begin with, destroy it
-			call execute('noautocmd bwipeout ' . a:file)
-			call s:debug('Destroyed buffer for', a:file)
-		endif
 	endif
 endfunction
 
