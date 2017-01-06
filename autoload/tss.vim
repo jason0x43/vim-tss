@@ -2,12 +2,15 @@ let s:path = expand('<sfile>:p:h')
 let s:startup_file = ''
 let s:ready = 0
 let s:job_names = {}
+let s:open_files = {}
 
 " Notify tsserver that a file is no longer being edited
 function! tss#closeFile(file)
 	if &filetype == 'javascript' && !g:tss_js 
 		return 
 	endif
+
+	unlet s:open_files[a:file]
 
 	call s:debug('Closing', a:file)
 	let job = jobstart(['node', s:path . '/../bin/close.js', a:file], {
@@ -143,6 +146,8 @@ function! tss#openFile(file)
 		return 
 	endif
 
+	let s:open_files[a:file] = 1
+
 	call s:debug('Opening', a:file)
 	let job = jobstart(['node', s:path . '/../bin/open.js', a:file], {
 		\ 'on_stderr': function('s:logHandler'),
@@ -224,10 +229,26 @@ function! tss#rename(...)
 	let file = expand('%')
 	let pos = getcurpos()
 
-	" Ensure tsserver view of file is up-to-date
-	call s:reloadFile(file)
+	echohl String
+	let symbol = input('New symbol name: ')
+	echohl None
 
-	call s:debug('Getting rename locations for ' . file)
+	if symbol == ''
+		call s:debug('Rename canceled')
+		return
+	endif
+
+	if symbol !~ '^[A-Za-z_\$][A-Za-z_\$0-9]*$'
+		redraw
+		call s:error('"' . symbol . '" is not a valid identifier')
+		return
+	endif
+
+	" Ensure tsserver view of all open project files is up-to-date
+	call s:reloadFiles()
+
+	call s:debug('Getting rename locations for symbol at (', pos[1], ',',
+		\ pos[2], 'in', file)
 	let output = system('node ' .
 		\ shellescape(s:path . '/../bin/rename.js') . flags .
 		\ shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
@@ -251,25 +272,11 @@ function! tss#rename(...)
 		return
 	endif
 
-	echohl String
-	let symbol = input('New symbol name: ')
-	echohl None
-
-	if symbol !~ '^[A-Za-z_\$][A-Za-z_\$0-9]*$'
-		redraw
-		call s:error('"' . symbol . '" is not a valid identifier')
-		return
-	endif
-
-	let locs = get(body, 'locs', [])
-	let fileLocs = get(body, 'requested', [])
-	let spanMap = get(body, 'spanMap', {})
-
-	call s:renameLocations(file, symbol, fileLocs)
-	" TODO: handle renames in other files
-	" for filename in keys(spanMap)
-	" 	call s:renameLocations(filename, symbol, spanMap[filename])
-	" endfor
+	let allLocs = get(body, 'locs', [])
+	for locs in allLocs
+		call s:debug('Processing rename locs', locs)
+		call s:renameLocations(locs.file, symbol, locs.locs)
+	endfor
 endfunction
 
 " Start an instance of tsserver for the current TS project
@@ -353,7 +360,7 @@ endfunction
 
 " Log an error message
 function! s:error(message)
-	echohl WarningMsg | echo 'TSS:' a:message | echohl None
+	echohl ErrorMsg | echo 'TSS:' a:message | echohl None
 endfunction
 
 " Implement a list of formatting directives in the current window
@@ -463,26 +470,69 @@ function! s:reloadFile(file)
 		\ . shellescape(a:file))
 endfunction
 
-" Rename instances of a symbol in a file
+" Notify tsserver that all open project files have new data
+function! s:reloadFiles()
+	" Save a reference to the original buffer
+	let buf = bufnr('%')
+
+	for file in keys(s:open_files)
+		call execute('buffer ' . bufnr(file))
+		call s:reloadFile(file)
+	endfor
+
+	" Switch back to the original buffer
+	call execute('buffer ' . buf)
+endfunction
+
+" Rename instances of a symbol in a file.
 function! s:renameLocations(file, symbol, locs)
+	call s:debug('Renaming', a:symbol, 'in', a:file, 'at', a:locs)
+
+	let originalFile = expand('%')
+	let originalPos = getcurpos()
+	let newFile = !has_key(s:open_files, a:file)
+
+	" Switch to the buffer of the file to be updated. Disable autocmds since
+	" we're just temporarily editing it.
+	if a:file != originalFile
+		call execute('noautocmd edit ' . a:file)
+		call s:debug('Opened', a:file)
+	endif
+
 	for loc in a:locs
 		let start = loc.start
 		let end = loc.end
 
 		if start.line != end.line
-			" TODO: notify the user?
+			call s:warn('Skipping invalid rename loc', loc)
 			continue
 		endif
 
 		let line = getline(start.line)
-
-		let pre = start.offset == 1 ? '' : line[:(start.offset - 2)]
-		let post = line[(end.offset - 1):]
+		let pre = start.offset == 1 ? '' : line[:start.offset - 2]
+		let post = line[end.offset - 1:]
 
 		call setline(start.line, pre . a:symbol . post)
 	endfor
 
-	call s:reloadFile(a:file)
+	if a:file != originalFile
+		if newFile
+			" If the file wasn't open to begin with, save it
+			noautocmd write
+			call s:debug('Saved', a:file)
+		endif
+
+		" Re-edit the original buffer. We do this before destroying the temp
+		" buffer to prevent vim from closing the window we were using.
+		call execute('buffer ' . originalFile)
+		call setpos('.', originalPos)
+
+		if newFile
+			" If the file wasn't open to begin with, destroy it
+			call execute('noautocmd bwipeout ' . a:file)
+			call s:debug('Destroyed buffer for', a:file)
+		endif
+	endif
 endfunction
 
 " Handle tsserver startup messages
@@ -520,3 +570,9 @@ function! s:toLoclistEntries(locs)
 	call s:debug('Created loclist entries:', entries)
 	return entries
 endfunction
+
+" Log an error message
+function! s:warn(message)
+	echohl WarningMsg | echo 'TSS:' a:message | echohl None
+endfunction
+

@@ -42,30 +42,7 @@ const location: RenameLocation = {
 	...flags
 };
 
-interface RenameResult extends protocol.RenameResponseBody {
-	requested: protocol.TextSpan[];
-	spanMap: { [ key: string]: protocol.TextSpan[] };
-}
-
 rename(location)
-	.then(response => {
-		const result: RenameResult = {
-			requested: undefined,
-			spanMap: {},
-			...response
-		};
-
-		response.locs.forEach(spanGroup => {
-			if (spanGroup.file === location.file) {
-				result.requested = spanGroup.locs;
-			}
-			else {
-				result.spanMap[spanGroup.file] = spanGroup.locs;
-			}
-		});
-
-		return result;
-	})
 	.then(success)
 	.catch(failure)
 	.then(end);
