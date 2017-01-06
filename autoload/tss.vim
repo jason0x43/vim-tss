@@ -171,7 +171,6 @@ function! tss#quickinfo()
 	call s:debug('Response:', response)
 
 	if get(response, 'success', 0)
-		redraw
 		call s:debug('Successful response')
 		if get(response.body, 'displayString', '') != ''
 			call s:print(response.body.displayString)
@@ -231,21 +230,6 @@ function! tss#rename(...)
 	let file = expand('%')
 	let pos = getcurpos()
 
-	echohl String
-	let symbol = input('New symbol name: ')
-	echohl None
-
-	if symbol == ''
-		call s:debug('Rename canceled')
-		return
-	endif
-
-	if symbol !~ '^[A-Za-z_\$][A-Za-z_\$0-9]*$'
-		redraw
-		call s:error('"' . symbol . '" is not a valid identifier')
-		return
-	endif
-
 	" Ensure tsserver view of all open project files is up-to-date
 	call s:reloadFiles()
 
@@ -256,9 +240,8 @@ function! tss#rename(...)
 		\ shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
 
 	let response = json_decode(output)
-	
+
 	if !get(response, 'success', 0)
-		redraw
 		let message = get(response, 'message', string(response))
 		call s:error('Error getting rename locations: ' . message)
 		return
@@ -268,9 +251,22 @@ function! tss#rename(...)
 	let info = get(body, 'info', {})
 
 	if !get(info, 'canRename', 0)
-		redraw
 		let message = get(info, 'localizedErrorMessage', string(response))
 		call s:error(message)
+		return
+	endif
+
+	echohl String
+	let symbol = input('New symbol name: ')
+	echohl None
+
+	if symbol == ''
+		call s:debug('Rename canceled')
+		return
+	endif
+
+	if symbol !~ '^[A-Za-z_\$][A-Za-z_\$0-9]*$'
+		call s:error('"' . symbol . '" is not a valid identifier')
 		return
 	endif
 
@@ -345,6 +341,7 @@ endfunction
 " Log a debug message
 function! s:debug(...)
 	if g:tss_verbose
+		redraw
 		echom 'TSS:' join(a:000, ' ')
 	endif
 endfunction
@@ -366,6 +363,7 @@ endfunction
 
 " Log an error message
 function! s:error(message)
+	redraw
 	echohl ErrorMsg | echo 'TSS:' a:message | echohl None
 endfunction
 
@@ -466,6 +464,7 @@ endfunction
 
 " Display a message
 function! s:print(message)
+	redraw
 	echo a:message
 endfunction
 
