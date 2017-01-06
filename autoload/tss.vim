@@ -9,42 +9,17 @@ function! tss#closeFile(file)
 		return 
 	endif
 
-	call tss#debug('Closing', a:file)
+	call s:debug('Closing', a:file)
 	let job = jobstart(['node', s:path . '/../bin/close.js', a:file], {
 		\ 'on_exit': function('s:exitHandler')
 		\ })
 	let s:job_names[job] = 'Close ' . a:file
 endfunction
 
-" Get completions for the given file and offset
-function! tss#completions(file, line, offset, ...)
-	let prefix = a:0 > 0 ? (' ' . shellescape(a:1)) : ''
-	let ignoreCase = g:tss_completion_ignore_case ? ' -i ' : ' '
-
-	call tss#debug('Getting completions for', a:file)
-	let output = system('node ' .
-		\ shellescape(s:path . '/../bin/completions.js') . ignoreCase .
-		\ shellescape(a:file) . ' ' . a:line . ' ' . a:offset . prefix)
-
-	return json_decode(output)
-endfunction
-
-" Log a debug message
-function! tss#debug(...)
-	if g:tss_verbose
-		echom 'TSS:' join(a:000, ' ')
-	endif
-endfunction
-
 " Populate the location list with the locations of definitions of the symbol
 " at the current cursor position
 function! tss#definition()
 	call s:getLocations('definition')
-endfunction
-
-" Log an error message
-function! tss#error(message)
-	echohl WarningMsg | echo 'TSS:' a:message | echohl None
 endfunction
 
 " Populate the quickfix list with errors for the current buffer 
@@ -57,11 +32,11 @@ function! tss#errors()
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	call tss#debug('Getting errors for', file)
+	call s:debug('Getting errors for', file)
 	let output = system('node ' . shellescape(s:path . '/../bin/errors.js')
 		\ . ' ' . shellescape(file) . ' -n -j')
 	let response = json_decode(output)
-	call tss#debug('Got errors response:', response)
+	call s:debug('Got errors response:', response)
 
 	if get(response, 'success', 0)
 		call setqflist(s:toLoclistEntries(response.body), 'a')
@@ -79,7 +54,7 @@ function! tss#format()
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	call tss#debug('Formatting', file)
+	call s:debug('Formatting', file)
 	let output = system('node ' . shellescape(s:path . '/../bin/format.js')
 		\ . ' ' . shellescape(file))
 	call s:format(json_decode(output))
@@ -102,7 +77,8 @@ function! tss#init()
 	command! -buffer TssReloadProjects :call tss#reloadProjects()
 	command! -buffer TssRename :call tss#rename()
 	command! -buffer TssRenameComments :call tss#rename({ 'comments': 1 })
-	command! -buffer TssRenameCommentsStrings :call tss#rename({ 'comments': 1, 'strings': 1 })
+	command! -buffer TssRenameCommentsStrings :call tss#rename(
+		\ { 'comments': 1, 'strings': 1 })
 	command! -buffer TssRenameStrings :call tss#rename({ 'strings': 1 })
 	command! -buffer TssStart :call tss#start()
 	command! -buffer TssStop :call tss#stop()
@@ -133,15 +109,16 @@ function! tss#omnicomplete(findstart, base)
 
 		return offset - 1
 	else
-		let response = tss#completions(file, pos[1], offset, a:base)
-		call tss#debug('Completion response:', response)
+		let response = s:completions(file, pos[1], offset, a:base)
+		call s:debug('Completion response:', response)
 
 		if get(response, 'success', 0)
 			let enableMenu = stridx(&completeopt, 'menu') != -1
 
 			if enableMenu
 				for comp in response.body
-					call complete_add({ 'word': comp.name, 'menu': comp.kind })
+					call complete_add({ 'word': comp.name,
+						\ 'menu': comp.kind })
 
 					if complete_check()
 						break
@@ -154,7 +131,7 @@ function! tss#omnicomplete(findstart, base)
 			endif
 		else
 			let message = get(response, 'message', string(response))
-			call tss#error('Error requesting completions: ' . message)
+			call s:error('Error requesting completions: ' . message)
 			return []
 		endif
 	endif
@@ -166,7 +143,7 @@ function! tss#openFile(file)
 		return 
 	endif
 
-	call tss#debug('Opening', a:file)
+	call s:debug('Opening', a:file)
 	let job = jobstart(['node', s:path . '/../bin/open.js', a:file], {
 		\ 'on_stderr': function('s:logHandler'),
 		\ 'on_exit': function('s:exitHandler')
@@ -174,6 +151,7 @@ function! tss#openFile(file)
 	let s:job_names[job] = 'Open ' . a:file
 endfunction
 
+" Display summary information for the symbol under the cursor
 function! tss#quickinfo()
 	let file = expand('%')
 	let pos = getcurpos()
@@ -181,37 +159,56 @@ function! tss#quickinfo()
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	call tss#debug('Getting quick info for', file)
+	call s:debug('Getting quick info for', file)
 	let output = system('node ' .
 		\ shellescape(s:path . '/../bin/quickinfo.js') . ' ' .
 		\ shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
 
 	let response = json_decode(output)
-	call tss#debug('Response:', response)
+	call s:debug('Response:', response)
 
 	if get(response, 'success', 0)
 		redraw
-		call tss#debug('Successful response')
+		call s:debug('Successful response')
 		if get(response.body, 'displayString', '') != ''
-			call tss#print(response.body.displayString)
+			call s:print(response.body.displayString)
 			if get(response.body, 'documentation', '') != ''
-				call tss#print("\n" . response.body.documentation)
+				call s:print("\n" . response.body.documentation)
 			endif
 		else
-			call tss#print('No hint at the cursor')
+			call s:print('No hint at the cursor')
 		endif
 	else
 		let message = get(response, 'message', string(response))
-		call tss#error('Error getting info: ' . message)
+		call s:error('Error getting info: ' . message)
 	endif
+endfunction
+
+" Called before saving a TS file
+function! tss#preSave()
+	if &filetype == 'javascript' && !g:tss_js 
+		return 
+	endif
+
+	if g:tss_format_on_save 
+		call tss#format()
+	endif
+endfunction 
+
+" Populate the location list with references to the symbol at the current
+" cursor position
+function! tss#references()
+	call s:getLocations('references')
 endfunction
 
 " Reload project files in the tsserver instance
 function! tss#reloadProjects()
-	call tss#debug('Reloading projects')
-	call execute('!node ' . shellescape(s:path . '/../bin/reload-projects.js'))
+	call s:debug('Reloading projects')
+	call execute('!node ' . shellescape(s:path .
+		\ '/../bin/reload-projects.js'))
 endfunction
 
+" Rename a symbol in a project
 function! tss#rename(...)
 	let flags = ' '
 
@@ -230,7 +227,7 @@ function! tss#rename(...)
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	call tss#debug('Getting rename locations for ' . file)
+	call s:debug('Getting rename locations for ' . file)
 	let output = system('node ' .
 		\ shellescape(s:path . '/../bin/rename.js') . flags .
 		\ shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
@@ -240,7 +237,7 @@ function! tss#rename(...)
 	if !get(response, 'success', 0)
 		redraw
 		let message = get(response, 'message', string(response))
-		call tss#error('Error getting rename locations: ' . message)
+		call s:error('Error getting rename locations: ' . message)
 		return
 	endif
 
@@ -250,7 +247,7 @@ function! tss#rename(...)
 	if !get(info, 'canRename', 0)
 		redraw
 		let message = get(info, 'localizedErrorMessage', string(response))
-		call tss#error(message)
+		call s:error(message)
 		return
 	endif
 
@@ -260,7 +257,7 @@ function! tss#rename(...)
 
 	if symbol !~ '^[A-Za-z_\$][A-Za-z_\$0-9]*$'
 		redraw
-		call tss#error('"' . symbol . '" is not a valid identifier')
+		call s:error('"' . symbol . '" is not a valid identifier')
 		return
 	endif
 
@@ -273,28 +270,6 @@ function! tss#rename(...)
 	" for filename in keys(spanMap)
 	" 	call s:renameLocations(filename, symbol, spanMap[filename])
 	" endfor
-endfunction
-
-" Called before saving a TS file
-function! tss#preSave()
-	if &filetype == 'javascript' && !g:tss_js 
-		return 
-	endif
-
-	if g:tss_format_on_save 
-		call tss#format()
-	endif
-endfunction 
-
-" Display a message
-function! tss#print(message)
-	echo a:message
-endfunction
-
-" Populate the location list with references to the symbol at the current
-" cursor position
-function! tss#references()
-	call s:getLocations('references')
 endfunction
 
 " Start an instance of tsserver for the current TS project
@@ -314,7 +289,7 @@ function! tss#start()
 		let cmd = add(cmd, '--debug-tsserver')
 	endif
 
-	call tss#debug('Starting server for', s:startup_file)
+	call s:debug('Starting server for', s:startup_file)
 	let g:tss_server_id = jobstart(cmd, {
 		\ 'on_stderr': function('s:startHandler'),
 		\ 'on_exit': function('s:exitHandler')
@@ -329,7 +304,7 @@ function! tss#stop()
 		return 
 	endif
 
-	call tss#debug('Stopping server')
+	call s:debug('Stopping server')
 	let job = jobstart(['node', s:path . '/../bin/stop.js'], {
 		\ 'on_stderr': function('s:logHandler'),
 		\ 'on_exit': function('s:exitHandler')
@@ -337,13 +312,37 @@ function! tss#stop()
 	let s:job_names[job] = 'Server stop'
 endfunction 
 
+" ----------------------------------------------------------------------------
+" Support functions
+" ----------------------------------------------------------------------------
+
+" Get completions for the given file and offset
+function! s:completions(file, line, offset, ...)
+	let prefix = a:0 > 0 ? (' ' . shellescape(a:1)) : ''
+	let ignoreCase = g:tss_completion_ignore_case ? ' -i ' : ' '
+
+	call s:debug('Getting completions for', a:file)
+	let output = system('node ' .
+		\ shellescape(s:path . '/../bin/completions.js') . ignoreCase .
+		\ shellescape(a:file) . ' ' . a:line . ' ' . a:offset . prefix)
+
+	return json_decode(output)
+endfunction
+
+" Log a debug message
+function! s:debug(...)
+	if g:tss_verbose
+		echom 'TSS:' join(a:000, ' ')
+	endif
+endfunction
+
 " Handle exit messages from async jobs
 function! s:exitHandler(job_id, code)
 	if a:code 
-		call tss#error(s:job_names[a:job_id] . ' failed: ' . a:code)
+		call s:error(s:job_names[a:job_id] . ' failed: ' . a:code)
 	endif
 
-	call tss#debug(s:job_names[a:job_id], 'ended')
+	call s:debug(s:job_names[a:job_id], 'ended')
 
 	if a:job_id == g:tss_server_id
 		" If the server job died, clear the server ID field
@@ -352,11 +351,16 @@ function! s:exitHandler(job_id, code)
 	endif
 endfunction
 
+" Log an error message
+function! s:error(message)
+	echohl WarningMsg | echo 'TSS:' a:message | echohl None
+endfunction
+
 " Implement a list of formatting directives in the current window
 function! s:format(response)
 	if !get(a:response, 'success', 0)
 		let message = get(a:response, 'message', string(response))
-		call tss#error('Error formatting: ' . message)
+		call s:error('Error formatting: ' . message)
 		return
 	endif
 
@@ -370,7 +374,7 @@ function! s:format(response)
 	set ve+=onemore
 
 	for entry in a:response.body
-		call tss#debug('Processing format entry', entry)
+		call s:debug('Processing format entry', entry)
 
 		let line = entry.start.line
 		let offset = entry.start.offset
@@ -382,7 +386,7 @@ function! s:format(response)
 		:normal mk
 		call cursor(line, offset)
 		:normal d`k
-		call tss#debug('Deleted text from (' . line . ',' . offset . ') to ('
+		call s:debug('Deleted text from (' . line . ',' . offset . ') to ('
 			\ . endLine . ',' . endOffset . ')')
 
 		" If there's new content, paste it into the buffer
@@ -391,18 +395,18 @@ function! s:format(response)
 			call setreg('m', newText)
 			let @m = newText
 			:normal "mP
-			call tss#debug('Inserted "' . newText . '" at (' . line . ',' .
+			call s:debug('Inserted "' . newText . '" at (' . line . ',' .
 				\ offset . ')')
 		endif
 	endfor
 
 	" Restore the mark if it previously existed, or delete it
 	if mark[0] == 'mark'
-		call tss#debug('Restoring mark', mark)
+		call s:debug('Restoring mark', mark)
 		call cursor(mark[5], mark[6])
 		:normal mk
 	else 
-		call tss#debug('Deleting mark k')
+		call s:debug('Deleting mark k')
 		delmarks k
 	endif
 
@@ -411,39 +415,6 @@ function! s:format(response)
 	call setreg('m', tmp)
 	call winrestview(view)
 endfunction 
-
-" Display messages from a process
-function! s:logHandler(job_id, data)
-	call tss#debug('Log:', join(a:data))
-endfunction 
-
-" Handle tsserver startup messages
-function! s:startHandler(job_id, data)
-	call s:logHandler(a:job_id, a:data)
-
-	if s:ready 
-		return 
-	endif
-
-	let data = join(a:data)
-	if data =~ 'Listening on'
-		let s:ready = 1
-		call tss#debug('Server started')
-
-		" After the server starts, open the current file
-		if s:startup_file != ''
-			call tss#debug('Opening initial file', s:startup_file)
-			call tss#openFile(s:startup_file)
-		endif
-	endif
-endfunction
-
-" Notify tsserver that a file has new data
-function! s:reloadFile(file)
-	call tss#debug('Reloading', a:file)
-	call execute('w !node ' . shellescape(s:path . '/../bin/reload.js') . ' '
-		\ . shellescape(a:file))
-endfunction
 
 " Populate the location list with {references, definitions, implementations}
 function! s:getLocations(type)
@@ -456,10 +427,10 @@ function! s:getLocations(type)
 	" Ensure tsserver view of file is up-to-date
 	call s:reloadFile(file)
 
-	call tss#debug('Finding', a:type)
+	call s:debug('Finding', a:type)
 	let output = system('node ' . shellescape(s:path . '/../bin/' . a:type
 		\ . '.js') . ' ' . shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
-	call tss#debug('Got output:', output)
+	call s:debug('Got output:', output)
 
 	let response = json_decode(output)
 	if get(response, 'success', 0)
@@ -469,26 +440,30 @@ function! s:getLocations(type)
 		ll 1
 	else
 		let message = get(response, 'message', string(response))
-		call tss#error('Error requesting locations: ' . message)
+		call s:error('Error requesting locations: ' . message)
 		echom 'No results'
 		return
 	endif
 endfunction 
 
-function! s:toLoclistEntries(locs)
-	let entries = []
-	for loc in a:locs
-		let entries = add(entries, {
-			\ 'filename': loc.file,
-			\ 'lnum': loc.line,
-			\ 'col': loc.offset,
-			\ 'text': loc.text
-			\ })
-	endfor
-	call tss#debug('Created loclist entries:', entries)
-	return entries
+" Display messages from a process
+function! s:logHandler(job_id, data)
+	call s:debug('Log:', join(a:data))
+endfunction 
+
+" Display a message
+function! s:print(message)
+	echo a:message
 endfunction
 
+" Notify tsserver that a file has new data
+function! s:reloadFile(file)
+	call s:debug('Reloading', a:file)
+	call execute('w !node ' . shellescape(s:path . '/../bin/reload.js') . ' '
+		\ . shellescape(a:file))
+endfunction
+
+" Rename instances of a symbol in a file
 function! s:renameLocations(file, symbol, locs)
 	for loc in a:locs
 		let start = loc.start
@@ -508,4 +483,40 @@ function! s:renameLocations(file, symbol, locs)
 	endfor
 
 	call s:reloadFile(a:file)
+endfunction
+
+" Handle tsserver startup messages
+function! s:startHandler(job_id, data)
+	call s:logHandler(a:job_id, a:data)
+
+	if s:ready 
+		return 
+	endif
+
+	let data = join(a:data)
+	if data =~ 'Listening on'
+		let s:ready = 1
+		call s:debug('Server started')
+
+		" After the server starts, open the current file
+		if s:startup_file != ''
+			call s:debug('Opening initial file', s:startup_file)
+			call tss#openFile(s:startup_file)
+		endif
+	endif
+endfunction
+
+" Convert a set of location objects to loclist entries
+function! s:toLoclistEntries(locs)
+	let entries = []
+	for loc in a:locs
+		let entries = add(entries, {
+			\ 'filename': loc.file,
+			\ 'lnum': loc.line,
+			\ 'col': loc.offset,
+			\ 'text': loc.text
+			\ })
+	endfor
+	call s:debug('Created loclist entries:', entries)
+	return entries
 endfunction
