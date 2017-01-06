@@ -4,7 +4,7 @@
 
 import { RenameLocation, rename, success, failure, end } from './lib/client';
 import { die } from './lib/log';
-import { basename } from 'path';
+import { basename, relative } from 'path';
 
 function parseFlags(args: string[]): [string[], any] {
 	const flags: any = {};
@@ -43,6 +43,18 @@ const location: RenameLocation = {
 };
 
 rename(location)
+	.then(response => {
+		// Remove any locs that are in node_modules
+		response.locs = response.locs.filter(loc => {
+			return !(/\bnode_modules\//).test(loc.file);
+		});
+		// Make all loc files relative to the CWD, which is also what VIM
+		// should be doing
+		response.locs.forEach(loc => {
+			loc.file = relative('.', loc.file);
+		});
+		return response;
+	})
 	.then(success)
 	.catch(failure)
 	.then(end);
