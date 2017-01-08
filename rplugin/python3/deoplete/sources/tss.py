@@ -11,6 +11,7 @@ class Source(Base):
 		self.logfile = open('tss.log', mode='a')
 		self.rank = 700
 		self.vim = vim
+		self.min_pattern_length = 1
 
 	def __del__(self):
 		self.logfile.close()
