@@ -321,6 +321,14 @@ function! tss#stop()
 	let s:job_names[job] = 'Server stop'
 endfunction
 
+" Get tags for the current file
+function! tss#tags()
+	call s:debug('Getting tags')
+	let file = expand('%')
+	return systemlist('node ' . shellescape(s:path . '/../bin/tags.js')
+		\ . ' ' . shellescape(file))
+endfunction
+
 " ----------------------------------------------------------------------------
 " Support functions
 " ----------------------------------------------------------------------------
