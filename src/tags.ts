@@ -1,5 +1,5 @@
 /**
- * Print the navbar structure for a file
+ * Print ctags for a module.
  */
 
 import { navBar, end, parseFileArg } from './lib/client';
@@ -9,6 +9,12 @@ const file = parseFileArg('file');
 
 navBar(file)
 	.then(response => {
+		// Assume we're only getting nav items for a single file, such that
+		// there will be a single top-level module entry. By default the nav
+		// results include a hierarchical structure rooted at an entry for the
+		// module, and also entries for each symbol exported from the module.
+		// Since the module entry includes these top-level items as childItems,
+		// only consider the module entry.
 		response[0].childItems.forEach(item => {
 			printItemTag(item, []);
 		});
