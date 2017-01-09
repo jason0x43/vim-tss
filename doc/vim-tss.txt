@@ -75,7 +75,7 @@ scripts.
 By default, the vim-tss will automatically start a tsserver instance when a
 TypeScript or JavaScript file is opened.
 
-Global Options                                               *vim-tss-options*
+GLOBAL OPTIONS                                               *vim-tss-options*
 
 *g:tss_completion_ignore_case*  If 1, ignore text case when finding completion
                               matches.
@@ -102,10 +102,39 @@ Global Options                                               *vim-tss-options*
 ==============================================================================
 4. Extras                                                     *vim-tss-extras*
 
+NEOMAKE                                                      *vim-tss-neomake*
+
 The plugin overrides Neomake's default 'tsc' make for TypeScript files with one
 that uses the TS language services syntactic and semantic error commands. This
 allows Neomake to display errors almost instantaneously even for large
 projects. The plugin also sets up a 'tss' maker for JavaScript files and makes
 it and 'jshint' the default makers.
+
+FZF                                                              *vim-tss-fzf*
+
+The tss#tags function can be used for quick tag searching with fzf. For
+example: >
+
+    " Tell fzf to display tags for the current module
+    function! s:ts_tags()
+        call fzf#run({
+            \ 'options': '-s -d "\t" --with-nth 4,1 -n 1 --tiebreak=index',
+            \ 'source': tss#tags(),
+            \ 'sink': function('s:tags_sink'),
+            \ 'down': '20%'
+            \ })
+    endfunction
+
+    " Process a tag line when the user selects it
+    function! s:tags_sink(line)
+        execute split(a:line, "\t")[2]
+    endfunction
+
+    " Bind the call to a globally accessible command
+    command! TsTags call s:ts_tags()
+
+    " Create a mapping for quick access to the command
+    map <silent> <Leader>t :TsTags<CR>
+>
 
 vim:et ft=help tw=78 isk+=<,>,\
