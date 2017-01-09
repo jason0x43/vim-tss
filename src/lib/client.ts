@@ -163,7 +163,7 @@ export function getFileExtent(file: string) {
 
 export function failure(err: Error) {
 	const response = { success: false, message: err.message };
-	return print(`${JSON.stringify(response, null, '  ')}\n`);
+	print(`${JSON.stringify(response, null, '  ')}\n`);
 }
 
 export function format(file: string, fileExtent?: FileRange | Promise<FileRange>) {
@@ -331,7 +331,7 @@ export function quickInfo(fileLocation: FileLocation) {
 
 export function success(value: any) {
 	const response = { success: true, body: value };
-	return print(`${JSON.stringify(response, null, '  ')}\n`);
+	print(`${JSON.stringify(response, null, '  ')}\n`);
 }
 
 export function references(fileLocation: FileLocation) {

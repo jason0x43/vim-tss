@@ -3,15 +3,15 @@
  */
 
 import { format } from 'util';
+import { writeSync } from 'fs';
 
 export function debug(...args: any[]) {
 	return _debug(...args);
 }
 
 export function die(...args: any[]) {
-	error(...args).then(() => {
-		process.exit(1);
-	});
+	error(...args);
+	process.exit(1);
 }
 
 export function error(...args: any[]) {
@@ -20,21 +20,19 @@ export function error(...args: any[]) {
 
 export function log(...args: any[]) {
 	const time = new Date().toLocaleTimeString('en-US', { hour12: false });
-	return new Promise(resolve => {
-		process.stderr.write(`${time} ${format.apply(null, args)}\n`, resolve);
-	});
+	// Sync write to stderr
+	writeSync(2, `${time} ${format.apply(null, args)}\n`);
 }
 
 export function print(message: Buffer | string) {
 	if (typeof message !== 'string') {
 		message = message.toString('utf8');
 	}
-	return new Promise(resolve => {
-		process.stdout.write(message, resolve);
-	});
+	// Sync write to stdout
+	writeSync(1, message);
 }
 
-let _debug = (..._args: any[]) => { return Promise.resolve<{}>(null); };
+let _debug = (..._args: any[]) => {};
 
 if (process.env['VIM_TSS_LOG']) {
 	const verbosity = Number(process.env['VIM_TSS_LOG']);
