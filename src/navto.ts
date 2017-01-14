@@ -2,21 +2,15 @@
  * Print navto items for a symbol in a file
  */
 
-import { navTo, success, failure, end } from './lib/client';
-import { die } from './lib/log';
-import { basename } from 'path';
+import { connect, end, failure, navTo, success } from './lib/client';
+import { parseArgs } from './lib/opts';
 
-const args = process.argv.slice(2);
-const searchProject = args[0] === '--search-project' || args[0] === '-s';
+const { args, flags, port } = parseArgs({
+	args: [ 'file', 'searchValue' ],
+	flags: { 'search-project': 's' }
+});
 
-if (searchProject) {
-	args.shift();
-}
-
-if (args.length < 2) {
-	const command = basename(process.argv[1]);
-	die(`usage: ${command} [-s,--search-project] filename searchValue`);
-}
+const searchProject = flags['search-project'];
 
 const navToArgs: protocol.NavtoRequestArgs = {
 	file: args[0],
@@ -24,7 +18,7 @@ const navToArgs: protocol.NavtoRequestArgs = {
 	currentFileOnly: !searchProject
 };
 
-navTo(navToArgs)
+connect(port).then(() => navTo(navToArgs))
 	.then(success)
 	.catch(failure)
 	.then(end);

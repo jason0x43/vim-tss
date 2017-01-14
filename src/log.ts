@@ -2,10 +2,13 @@
  * Display requests and responses for the current project's tsserver
  */
 
-import { registerLogger } from './lib/client';
+import { connect, registerLogger } from './lib/client';
 import { die } from './lib/log';
+import { parseArgs } from './lib/opts';
 
-registerLogger().then(client => {
+const { port } = parseArgs();
+
+connect(port).then(() => registerLogger()).then(client => {
 	client.on('data', data => {
 		process.stdout.write(data);
 	});

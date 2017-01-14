@@ -1,24 +1,5 @@
 import { FileLocation } from './client';
-import { die } from './log';
 import { readFile } from 'fs';
-import { basename } from 'path';
-
-export function parseArgs() {
-	const args = process.argv.slice(2);
-
-	if (args.length !== 3) {
-		const command = basename(process.argv[1]);
-		die(`usage: ${command} filename line offset`);
-	}
-
-	const fileLocation: FileLocation = {
-		file: args[0],
-		line:  Number(args[1]),
-		offset: Number(args[2])
-	};
-
-	return fileLocation;
-}
 
 export function toFileLocations(spans: protocol.FileSpan[], loadText = true) {
 	let fileLines: { [filename: string]: protocol.Location[] } = {};

@@ -2,6 +2,9 @@
  * Gracefully stop a running tsserver
  */
 
-import { exit } from './lib/client';
+import { connect, exit } from './lib/client';
+import { parseArgs } from './lib/opts';
 
-exit();
+const { opts } = parseArgs();
+
+connect(Number(opts['port'])).then(() => exit());

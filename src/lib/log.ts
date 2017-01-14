@@ -10,7 +10,7 @@ export function debug(...args: any[]) {
 }
 
 export function die(...args: any[]) {
-	error(...args);
+	print(`${format(args[0], ...args.slice(1))}\n`);
 	process.exit(1);
 }
 
@@ -21,7 +21,7 @@ export function error(...args: any[]) {
 export function log(...args: any[]) {
 	const time = new Date().toLocaleTimeString('en-US', { hour12: false });
 	// Sync write to stderr
-	writeSync(2, `${time} ${format.apply(null, args)}\n`);
+	writeSync(2, `${time} ${format(args[0], ...args.slice(1))}\n`);
 }
 
 export function print(message: Buffer | string) {

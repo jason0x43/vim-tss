@@ -2,12 +2,20 @@
  * Print the signature help for a location
  */
 
-import { parseArgs } from './lib/locate';
-import { signatureHelp, success, failure, end } from './lib/client';
+import { parseArgs } from './lib/opts';
+import { connect, end, failure, FileLocation, signatureHelp, success } from './lib/client';
 
-const fileLocation = parseArgs();
+const { args, port } = parseArgs({
+	args: [ 'file', 'line', 'offset' ]
+});
 
-signatureHelp(fileLocation)
+const location: FileLocation = {
+	file: args[0],
+	line:  Number(args[1]),
+	offset: Number(args[2])
+};
+
+connect(port).then(() => signatureHelp(location))
 	.then(success)
 	.catch(failure)
 	.then(end);

@@ -2,7 +2,10 @@
  * Tell tsserver to reload all loaded projects
  */
 
-import { reloadProjects, end } from './lib/client';
+import { connect, end, reloadProjects } from './lib/client';
+import { parseArgs } from './lib/opts';
 
-reloadProjects()
+const { port } = parseArgs();
+
+connect(port).then(() => reloadProjects())
 	.then(end);

@@ -5,11 +5,10 @@
 import { ChildProcess, execSync, spawn } from 'child_process';
 import { createServer, Socket } from 'net';
 import { join } from 'path';
-import { statSync, unlink } from 'fs';
 import { debug, error, log, print } from './lib/log';
 import { MessageHandler } from './lib/messages';
-import { getProjectConfig, getSocketFile } from './lib/connect';
-import { configure } from './lib/client';
+import { parseArgs } from './lib/opts';
+import { fileExists } from './lib/util';
 
 function commandExists(command: string) {
 	try {
@@ -19,16 +18,6 @@ function commandExists(command: string) {
 	}
 	catch (err) {
 		debug(`Error checking for command: ${err}`);
-		return false;
-	}
-}
-
-function fileExists(filename: string) {
-	try {
-		statSync(filename);
-		return true;
-	}
-	catch (err) {
 		return false;
 	}
 }
@@ -61,7 +50,42 @@ function findServerBin() {
 	}
 }
 
-let debugTsserver = process.argv[2] === '--debug-tsserver';
+function runAsDaemon() {
+	// This process is a daemon, so don't do anything else
+	if (process.env['__VIM_TSS_DAEMON__']) {
+		return;
+	}
+
+	// the child process will have this set so we can identify it as being daemonized
+	process.env['__VIM_TSS_DAEMON__'] = 1;
+
+	// start ourselves as a daemon
+	const child = spawn(process.execPath, process.argv.slice(1), {
+		stdio: [ 'ignore', 'ignore', 'ignore', 'ipc' ],
+		detached: true
+	});
+
+	// Wait for a message from the child with the port its running on, then exit
+	child.on('message', data => {
+		print(`VIM_TSS_PORT=${data.port}\n`);
+
+		// required so the parent can exit
+		child.unref();
+
+		process.exit(0);
+	});
+
+	// Wait for a message from the child with the port its running on, then exit
+	child.on('error', err => {
+		error(err);
+	});
+
+	child.on('exit', code => {
+		print(`Child exited with ${code}\n`);
+	});
+
+	return child.pid;
+}
 
 function startTsserver() {
 	if (debugTsserver) {
@@ -72,18 +96,16 @@ function startTsserver() {
 	}
 	log('Started tsserver');
 
-	// Pipe this process's stdin to the running tsserver's
-	process.stdin.pipe(tsserver.stdin);
-
 	tsserver.on('exit', function () {
-		debug('Server exited');
-
 		// If tsserver is exiting because the user asked it to, this process
 		// should also end
 		if (exiting) {
+			log('Exiting at user request');
 			process.exit(0);
 		}
 		else {
+			log('Server stopped; restarting');
+
 			tsserver.removeAllListeners();
 			tsserver = null;
 
@@ -104,102 +126,115 @@ function startTsserver() {
 	tsserver.stderr.on('data', (data: Buffer) => {
 		log(data.toString('utf8'));
 	});
-
-	// configure the newly created server
-	configure().catch(error);
 }
 
-process.on('SIGINT', () => process.exit(0));
-process.on('SIGTERM', () => process.exit(0));
+let tsserver: ChildProcess;
+const clients: Socket[] = [];
+let exiting = false;
+let alreadyRunning = false;
+let serverBin: string;
 
-process.on('exit', () => {
-	if (!alreadyRunning) {
-		if (tsserver) {
-			tsserver.kill();
-		}
-		// Ensure socket file is removed when process exits
-		if (socketFile) {
-			unlink(socketFile, _err => {});
-		}
+const { opts } = parseArgs({
+	flags: {
+		daemon: 'd',
+		'debug-tsserver': true
 	}
 });
 
-let exiting = false;
-let alreadyRunning = false;
-let tsserver: ChildProcess;
+let debugTsserver = opts['debug-tsserver'];
+let daemonize = opts['daemon'];
+let port = Number(opts['port'] || 0);
 
-const serverBin = findServerBin();
-if (!serverBin) {
-	error(`Couldn't find a copy of tsserver`);
-	process.exit(1);
+// If this is a daemon, processing will continue from here. If not, this
+// process will start a daemon and exit.
+let daemon: number;
+if (daemonize) {
+	daemon = runAsDaemon();
 }
 
-const configFile = getProjectConfig(process.cwd());
-if (!configFile) {
-	error('Could not find a config file');
-	process.exit(1);
-}
+if (daemon == null) {
+	process.on('SIGINT', () => process.exit(0));
+	process.on('SIGTERM', () => process.exit(0));
 
-const socketFile = getSocketFile(configFile);
-const clients: Socket[] = [];
-const loggers: Socket[] = [];
-
-const server = createServer(client => {
-	debug('Added client');
-	clients.push(client);
-
-	const clientHandler = new MessageHandler(client);
-
-	clientHandler.on('request', request => {
-		debug('Received request', request);
-
-		switch (request.command) {
-		case 'exit':
-			exiting = true;
-			break;
-		case 'logger':
-			loggers.push(client);
-			debug('Added logger');
-			return;
+	process.on('exit', () => {
+		if (!alreadyRunning) {
+			if (tsserver) {
+				tsserver.kill();
+			}
 		}
+	});
 
-		const message = `${JSON.stringify(request)}\n`;
-		tsserver.stdin.write(message);
-		loggers.forEach(logger => {
-			logger.write(message);
+	serverBin = findServerBin();
+	if (!serverBin) {
+		error(`Couldn't find a copy of tsserver`);
+		process.exit(1);
+	}
+
+	const loggers: Socket[] = [];
+
+	const server = createServer(client => {
+		debug('Added client');
+		clients.push(client);
+
+		const clientHandler = new MessageHandler(client);
+
+		clientHandler.on('request', request => {
+			debug('Received request', request);
+
+			switch (request.command) {
+				case 'exit':
+					exiting = true;
+					break;
+				case 'logger':
+					loggers.push(client);
+					debug('Added logger');
+					return;
+			}
+
+			const message = `${JSON.stringify(request)}\n`;
+			tsserver.stdin.write(message);
+			loggers.forEach(logger => {
+				logger.write(message);
+			});
+		});
+
+		client.on('end', () => {
+			clients.splice(clients.indexOf(client), 1);
+			debug('Removed client');
+
+			const logger = loggers.indexOf(client);
+			if (logger !== -1) {
+				loggers.splice(logger, 1);
+				debug('Removed logger');
+			}
+		});
+
+		client.on('error', err => {
+			error(`Client error: ${err}`);
 		});
 	});
 
-	client.on('end', () => {
-		clients.splice(clients.indexOf(client), 1);
-		debug('Removed client');
-
-		const logger = loggers.indexOf(client);
-		if (logger !== -1) {
-			loggers.splice(logger, 1);
-			debug('Removed logger');
+	server.on('error', (err: NodeJS.ErrnoException) => {
+		if (err.code === 'EADDRINUSE') {
+			debug(`Server is already running`);
+			log(`Listening on ${port}`);
+			alreadyRunning = true;
+			process.exit(0);
+		}
+		else {
+			error(`Error: ${err}`);
+			process.exit(1);
 		}
 	});
 
-	client.on('error', err => {
-		error(`Client error: ${err}`);
+	server.listen(port, () => {
+		port = server.address().port;
+		if (daemonize) {
+			process.send({ port });
+		}
+
+		startTsserver();
+		log(`Listening on port ${port}...`);
+		print(`VIM_TSS_PORT=${port}\n`);
 	});
-});
-
-server.on('error', (err: NodeJS.ErrnoException) => {
-	if (err.code === 'EADDRINUSE') {
-		debug(`Server is already running`);
-		log(`Listening on ${socketFile}...`);
-		alreadyRunning = true;
-		process.exit(0);
-	}
-	else {
-		error(`Error: ${err}`);
-		process.exit(1);
-	}
-});
-
-server.listen(socketFile, () => {
-	startTsserver();
-	log(`Listening on ${socketFile}...`);
-});
+}

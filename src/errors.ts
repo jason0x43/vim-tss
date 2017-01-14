@@ -6,34 +6,31 @@
 
 import {
 	FileLocation,
+	connect,
 	end,
 	failure,
 	getSemanticDiagnostics,
 	getSyntacticDiagnostics,
-	parseFileArg,
 	reloadFile,
 	success
 } from './lib/client';
+import { parseArgs } from './lib/opts';
 import { print } from './lib/log';
 
-const file = parseFileArg('file [-n,--no-reload] [-j,--json]');
-
-let noReload = false;
-let printJson = false;
-process.argv.slice(3).forEach(arg => {
-	switch (arg) {
-	case '-n':
-	case '--no-reload':
-		noReload = true;
-		break;
-	case '-j':
-	case '--json':
-		printJson = true;
-		break;
-	}
+const { flags, args, port } = parseArgs({
+	flags: { 'no-reload': 'n', json: 'j' },
+	args: [ 'file' ]
 });
 
-const promise = noReload ? Promise.resolve() : reloadFile(file);
+const file = args[0];
+const noReload = flags['no-reload'];
+const printJson = flags['json'];
+
+let promise: Promise<any> = connect(port);
+
+if (!noReload) {
+	promise = promise.then(() => reloadFile(file));
+}
 
 promise
 	.then(() => Promise.all([
@@ -49,7 +46,7 @@ promise
 		};
 		return loc;
 	}))
-	.then(locations => {
+	.then((locations: FileLocation[]) => {
 		if (printJson) {
 			return success(locations);
 		}

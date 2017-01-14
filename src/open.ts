@@ -2,9 +2,12 @@
  * Tell tsserver that a file is being edited
  */
 
-import { end, openFile, parseFileArg } from './lib/client';
+import { connect, end, openFile } from './lib/client';
 import { error } from './lib/log';
+import { parseArgs } from './lib/opts';
 
-const file = parseFileArg();
+const { args, port } = parseArgs({ args: [ 'file' ] });
 
-openFile(file).catch(error).then(end);
+connect(port).then(() => openFile(args[0]))
+	.catch(error)
+	.then(end);

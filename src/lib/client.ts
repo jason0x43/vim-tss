@@ -4,10 +4,10 @@
 
 import { createConnection, Socket } from 'net';
 import { MessageHandler, send } from './messages';
-import { getProjectConfig, getSocketFile } from './connect';
+import { getProjectConfig } from './connect';
 import { readFile } from 'fs';
-import { basename } from 'path';
-import { die, print } from './log';
+import { debug, error, print } from './log';
+import { fileExists } from './util';
 
 export interface FileLocation extends protocol.Location {
 	file: string;
@@ -47,32 +47,36 @@ export class ProtocolError extends Error {
 }
 
 export function closeFile(file: string) {
-	return connect(file).then(() => {
-		const request: protocol.CloseRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'close',
-			arguments: { file }
-		};
-		return sendRequest(request);
-	});
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
+
+	const request: protocol.CloseRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'close',
+		arguments: { file }
+	};
+	return sendRequest(request);
 }
 
 export function completions(location: CompletionLocation) {
-	return connect().then(() => {
-		const request: protocol.CompletionsRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'completions',
-			arguments: location
-		};
-		return sendRequest<protocol.CompletionEntry[]>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	if (!fileExists(location.file)) {
+		throw new Error(`File ${location.file} does not exist`);
+	}
+
+	const request: protocol.CompletionsRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'completions',
+		arguments: location
+	};
+	return sendRequest<protocol.CompletionEntry[]>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
-export function configure(file: string = null) {
+export function configure(file?: string) {
 	if (!file) {
 		file = getProjectConfig('.');
 	}
@@ -89,8 +93,7 @@ export function configure(file: string = null) {
 		});
 	});
 
-	return Promise.all([formatOptions, connect()]).then(results => {
-		const [formatOptions] = results;
+	return formatOptions.then(formatOptions => {
 		const request: protocol.ConfigureRequest = {
 			seq: getSequence(),
 			type: 'request',
@@ -101,17 +104,42 @@ export function configure(file: string = null) {
 	});
 }
 
-export function definition(fileLocation: FileLocation) {
-	return connect().then(() => {
-		const request: protocol.DefinitionRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'definition',
-			arguments: fileLocation
-		};
-		return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
-			resolve(response.body);
+export function connect(port?: number) {
+	if (!connected) {
+		port = port || Number(process.env['VIM_TSS_PORT']);
+
+		if (isNaN(port)) {
+			throw new Error('A port is required');
+		}
+
+		connected = new Promise<Socket>(resolve => {
+			debug(`client connecting to port ${port}`);
+			client = createConnection({ port }, () => {
+				resolve(client);
+			});
+
+			client.on('error', error => {
+				console.error('Error: ' + error.message);
+			});
+
+			client.on('close', hadError => {
+				process.exit(hadError ? 1 : 0);
+				client = null;
+			});
 		});
+	}
+	return connected;
+}
+
+export function definition(fileLocation: FileLocation) {
+	const request: protocol.DefinitionRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'definition',
+		arguments: fileLocation
+	};
+	return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
@@ -128,14 +156,12 @@ export function end() {
  * Tell tsserver to exit gracefully
  */
 export function exit() {
-	return connect().then(() => {
-		const request: protocol.ExitRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'exit'
-		};
-		return sendRequest(request).then(end);
-	});
+	const request: protocol.ExitRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'exit'
+	};
+	return sendRequest(request).then(end);
 }
 
 /**
@@ -147,6 +173,10 @@ export interface FileRange extends protocol.Location {
 }
 
 export function getFileExtent(file: string) {
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
+
 	return new Promise<FileRange>((resolve, reject) => {
 		readFile(file, (err, data) => {
 			if (err) {
@@ -163,14 +193,18 @@ export function getFileExtent(file: string) {
 
 export function failure(err: Error) {
 	const response = { success: false, message: err.message };
+	error(err);
 	print(`${JSON.stringify(response, null, '  ')}\n`);
 }
 
 export function format(file: string, fileExtent?: FileRange | Promise<FileRange>) {
-	const range = fileExtent || getFileExtent(file);
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
 
-	return Promise.all([range, connect()]).then(results => {
-		const [range] = results;
+	const range = Promise.resolve(fileExtent || getFileExtent(file));
+
+	return range.then(range => {
 		const request: protocol.FormatRequest = {
 			seq: getSequence(),
 			type: 'request',
@@ -190,142 +224,139 @@ export function format(file: string, fileExtent?: FileRange | Promise<FileRange>
 }
 
 export function getSemanticDiagnostics(file: string) {
-	return connect(file).then(() => {
-		const request: protocol.SemanticDiagnosticsSyncRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'semanticDiagnosticsSync',
-			arguments: { file }
-		};
-		return sendRequest<protocol.Diagnostic[]>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
+
+	const request: protocol.SemanticDiagnosticsSyncRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'semanticDiagnosticsSync',
+		arguments: { file }
+	};
+	return sendRequest<protocol.Diagnostic[]>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
 export function getSyntacticDiagnostics(file: string) {
-	return connect(file).then(() => {
-		const request: protocol.SyntacticDiagnosticsSyncRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'syntacticDiagnosticsSync',
-			arguments: { file }
-		};
-		return sendRequest<protocol.Diagnostic[]>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
+
+	const request: protocol.SyntacticDiagnosticsSyncRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'syntacticDiagnosticsSync',
+		arguments: { file }
+	};
+	return sendRequest<protocol.Diagnostic[]>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
 export function implementation(fileLocation: FileLocation) {
-	return connect().then(() => {
-		const request: protocol.ImplementationRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'implementation',
-			arguments: fileLocation
-		};
-		return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	const request: protocol.ImplementationRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'implementation',
+		arguments: fileLocation
+	};
+	return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
 export function info(file: string) {
-	return connect().then(() => {
-		const request: protocol.ProjectInfoRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'projectInfo',
-			arguments: {
-				file,
-				needFileNameList: false
-			}
-		};
-		return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
+
+	const request: protocol.ProjectInfoRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'projectInfo',
+		arguments: {
+			file,
+			needFileNameList: false
+		}
+	};
+	return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
 export function openFile(file: string, data?: string) {
-	return connect(file).then(() => {
-		const args: protocol.OpenRequestArgs = { file };
-		if (data != null) {
-			args.fileContent = data;
-		}
-		const request: protocol.OpenRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'open',
-			arguments: args
-		};
-		return sendRequest(request).then(end);
-	});
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
+
+	const args: protocol.OpenRequestArgs = { file };
+	if (data != null) {
+		args.fileContent = data;
+	}
+	const request: protocol.OpenRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'open',
+		arguments: args
+	};
+	return sendRequest(request).then(end);
 }
 
 export function navBar(file: string) {
-	return connect().then(() => {
-		const request: protocol.NavBarRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'navbar',
-			arguments: { file }
-		};
-		return sendRequest<protocol.NavigationBarItem[]>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
+
+	const request: protocol.NavBarRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'navbar',
+		arguments: { file }
+	};
+	return sendRequest<protocol.NavigationBarItem[]>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
 export function navTo(args: protocol.NavtoRequestArgs) {
-	return connect().then(() => {
-		const request: protocol.NavtoRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'navto',
-			arguments: args
-		};
-		return sendRequest<protocol.NavtoItem[]>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	const request: protocol.NavtoRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'navto',
+		arguments: args
+	};
+	return sendRequest<protocol.NavtoItem[]>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
 export function navTree(file: string) {
-	return connect().then(() => {
-		const request: protocol.NavTreeRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'navtree',
-			arguments: { file }
-		};
-		return sendRequest<protocol.NavTreeResponse>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
+
+	const request: protocol.NavTreeRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'navtree',
+		arguments: { file }
+	};
+	return sendRequest<protocol.NavTreeResponse>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
-export function parseFileArg(args?: string) {
-	const file = process.argv[2];
-	if (!file) {
-		const command = basename(process.argv[1]);
-		die(`usage: ${command} ${args || 'file'}`);
-	}
-	return file;
-}
-
 export function quickInfo(fileLocation: FileLocation) {
-	return connect().then(() => {
-		const request: protocol.QuickInfoRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'quickinfo',
-			arguments: fileLocation
-		};
-		return sendRequest<protocol.QuickInfoResponseBody>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	const request: protocol.QuickInfoRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'quickinfo',
+		arguments: fileLocation
+	};
+	return sendRequest<protocol.QuickInfoResponseBody>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
@@ -335,102 +366,92 @@ export function success(value: any) {
 }
 
 export function references(fileLocation: FileLocation) {
-	return connect().then(() => {
-		const request: protocol.ReferencesRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'references',
-			arguments: fileLocation
-		};
-		return sendRequest<protocol.ReferencesResponseBody>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	const request: protocol.ReferencesRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'references',
+		arguments: fileLocation
+	};
+	return sendRequest<protocol.ReferencesResponseBody>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
-export function registerLogger() {
-	return connect().then(() => {
-		const request: LoggerRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'logger'
-		};
-		return sendRequest(request);
-	}).then(() => {
+export function registerLogger(): Promise<Socket> {
+	const request: LoggerRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'logger'
+	};
+	return sendRequest(request).then(() => {
 		return client;
 	});
 }
 
 export function reloadFile(file: string, tmpfile?: string) {
-	return connect(file).then(() => {
-		const request: protocol.ReloadRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'reload',
-			arguments: {
-				file,
-				tmpfile: tmpfile || file
-			}
-		};
-		return sendRequest<void>(request, (response, resolve) => {
-			if (response.body && response.body['reloadFinished']) {
-				resolve();
-			}
-		});
+	if (!fileExists(file)) {
+		throw new Error(`File ${file} does not exist`);
+	}
+
+	const request: protocol.ReloadRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'reload',
+		arguments: {
+			file,
+			tmpfile: tmpfile || file
+		}
+	};
+	return sendRequest<void>(request, (response, resolve) => {
+		if (response.body && response.body['reloadFinished']) {
+			resolve();
+		}
 	});
 }
 
 export function reloadProjects() {
-	return connect().then(() => {
-		const request: protocol.ReloadProjectsRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'reloadProjects'
-		};
-		// reloadProjects doesn't return anything
-		return send(client, request);
-	});
+	const request: protocol.ReloadProjectsRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'reloadProjects'
+	};
+	// reloadProjects doesn't return anything
+	return send(client, request);
 }
 
 export function rename(location: RenameLocation) {
-	return connect().then(() => {
-		const request: protocol.RenameRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'rename',
-			arguments: location
-		};
-		return sendRequest<protocol.RenameResponseBody>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	const request: protocol.RenameRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'rename',
+		arguments: location
+	};
+	return sendRequest<protocol.RenameResponseBody>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
 export function signatureHelp(location: FileLocation) {
-	return connect().then(() => {
-		const request: protocol.SignatureHelpRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'signatureHelp',
-			arguments: location
-		};
-		return sendRequest<protocol.SignatureHelpResponse>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	const request: protocol.SignatureHelpRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'signatureHelp',
+		arguments: location
+	};
+	return sendRequest<protocol.SignatureHelpResponse>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
 export function typeDefinition(location: FileLocation) {
-	return connect().then(() => {
-		const request: protocol.TypeDefinitionRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'typeDefinition',
-			arguments: location
-		};
-		return sendRequest<protocol.TypeDefinitionResponse>(request, (response, resolve) => {
-			resolve(response.body);
-		});
+	const request: protocol.TypeDefinitionRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'typeDefinition',
+		arguments: location
+	};
+	return sendRequest<protocol.TypeDefinitionResponse>(request, (response, resolve) => {
+		resolve(response.body);
 	});
 }
 
@@ -446,36 +467,6 @@ const newline = 10;
 
 let client: Socket;
 let connected: Promise<Socket>;
-
-function connect(file?: string) {
-	if (!connected) {
-		if (!file) {
-			file = process.cwd();
-		}
-
-		connected = new Promise<Socket>((resolve, reject) => {
-			const configFile = getProjectConfig(file);
-			if (!configFile) {
-				reject(new Error('No project config'));
-				return;
-			}
-
-			client = createConnection(getSocketFile(configFile), () => {
-				resolve(client);
-			});
-
-			client.on('error', error => {
-				console.error('Error: ' + error.message);
-			});
-
-			client.on('close', hadError => {
-				process.exit(hadError ? 1 : 0);
-				client = null;
-			});
-		});
-	}
-	return connected;
-}
 
 function getSequence() {
 	return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);

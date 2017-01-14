@@ -2,23 +2,15 @@
  * Print the quick info of the symbol at a particular position in a file
  */
 
-import { CompletionLocation, completions, end, success, failure } from './lib/client';
-import { die } from './lib/log';
-import { basename } from 'path';
+import { CompletionLocation, completions, connect, end, success, failure } from './lib/client';
+import { parseArgs } from './lib/opts';
 
-const args = process.argv.slice(2);
+const { args, port, flags } = parseArgs({
+	args: [ 'file', 'line', 'offset', '[prefix...]' ],
+	flags: { 'ignore-case': 'i' }
+});
 
-const ignoreCase = args[0] === '--ignore-case' || args[0] === '-i';
-
-if (ignoreCase) {
-	args.shift();
-}
-
-if (args.length < 3) {
-	const command = basename(process.argv[1]);
-	die(`usage: ${command} [-i,--ignore-case] filename line offset `
-		+ '[prefix...]');
-}
+const ignoreCase = flags['ignore-case'];
 
 const location: CompletionLocation = {
 	file: args[0],
@@ -27,7 +19,7 @@ const location: CompletionLocation = {
 	prefix: args.slice(3).join(' ')
 };
 
-completions(location)
+connect(port).then(() => completions(location))
 	.then(entries => {
 		entries.sort((a, b) => {
 			if (a.sortText < b.sortText) {

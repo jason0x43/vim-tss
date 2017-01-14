@@ -2,12 +2,14 @@
  * Print ctags for a module.
  */
 
-import { navBar, end, parseFileArg } from './lib/client';
+import { connect, end, navBar } from './lib/client';
 import { die, print } from './lib/log';
+import { parseArgs } from './lib/opts';
 
-const file = parseFileArg('file');
+const { args, port } = parseArgs({ args: [ 'file' ] });
+const file = args[0];
 
-navBar(file)
+connect(port).then(() => navBar(file))
 	.then(response => {
 		// Assume we're only getting nav items for a single file, such that
 		// there will be a single top-level module entry. By default the nav

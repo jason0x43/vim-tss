@@ -2,11 +2,12 @@
  * Print the navbar structure for a file
  */
 
-import { navBar, end, success, failure, parseFileArg } from './lib/client';
+import { connect, end, failure, navBar, success } from './lib/client';
+import { parseArgs } from './lib/opts';
 
-const file = parseFileArg('file');
+const { args, port } = parseArgs({ args: [ 'file' ] });
 
-navBar(file)
+connect(port).then(() => navBar(args[0]))
 	.then(success)
 	.catch(failure)
 	.then(end);

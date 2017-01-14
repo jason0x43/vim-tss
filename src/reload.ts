@@ -3,11 +3,13 @@
  * stdin.
  */
 
-import { end, openFile, parseFileArg, reloadFile } from './lib/client';
+import { connect, end, openFile, reloadFile } from './lib/client';
 import { debug, error } from './lib/log';
+import { parseArgs } from './lib/opts';
 
-const file = parseFileArg('file [tmpfile]');
-const tmpfile = process.argv[3];
+const { args, port } = parseArgs({ args: [ 'file', '[tmpfile]' ] });
+const file = args[0];
+const tmpfile = args[1];
 
 const reader = new Promise<string>(resolve => {
 	let data: string;
@@ -23,12 +25,14 @@ const reader = new Promise<string>(resolve => {
 });
 
 reader.then(data => {
-	if (data != null) {
-		debug('Using data from stdin');
-		return openFile(file, data);
-	}
-	else {
-		debug('Using file data');
-		return reloadFile(file, tmpfile);
-	}
+	return connect(port).then(() => {
+		if (data != null) {
+			debug('Using data from stdin');
+			return openFile(file, data);
+		}
+		else {
+			debug('Using file data');
+			return reloadFile(file, tmpfile);
+		}
+	});
 }).catch(error).then(end);

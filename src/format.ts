@@ -4,27 +4,31 @@
  */
 
 import {
+	connect,
 	end,
 	failure,
 	format,
 	FileRange,
-	parseFileArg,
 	success
 } from './lib/client';
+import { parseArgs } from './lib/opts';
 
-const file = parseFileArg('file [line offset endLine endOffset]');
+const { args, port } = parseArgs({
+	args: [ 'file', '[line offset endLine endOffset]' ]
+});
 
-const args = process.argv.slice(3);
+const file = args[0];
+
 let range: FileRange;
-if (args.length >= 4) {
-	const line = Number(args[0]);
-	const offset = Number(args[1]);
-	const endLine = Number(args[2]);
-	const endOffset = Number(args[3]);
+if (args.length >= 5) {
+	const line = Number(args[1]);
+	const offset = Number(args[2]);
+	const endLine = Number(args[3]);
+	const endOffset = Number(args[4]);
 	range = { line, offset, endLine, endOffset };
 }
 
-format(file, range)
+connect(port).then(() => format(file, range))
 	.then(edits => {
 		// Reverse the list of edits so that they're printed in the order in
 		// which they should be applied.

@@ -2,12 +2,21 @@
  * Print the location(s) of the symbol at a particular position in a file
  */
 
-import { parseArgs, toFileLocations } from './lib/locate';
-import { definition, end, failure, success } from './lib/client';
+import { toFileLocations } from './lib/locate';
+import { connect, definition, end, FileLocation, failure, success } from './lib/client';
+import { parseArgs } from './lib/opts';
 
-const fileLocation = parseArgs();
+const { args, port } = parseArgs({
+	args: [ 'file', 'line', 'offset' ]
+});
 
-definition(fileLocation)
+const location: FileLocation = {
+	file: args[0],
+	line:  Number(args[1]),
+	offset: Number(args[2])
+};
+
+connect(port).then(() => definition(location))
 	.then(toFileLocations)
 	.then(success)
 	.catch(failure)

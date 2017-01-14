@@ -3,12 +3,20 @@
  * file
  */
 
-import { parseArgs } from './lib/locate';
-import { FileLocation, end, failure, references, success } from './lib/client';
+import { parseArgs } from './lib/opts';
+import { connect, end, failure, FileLocation, references, success } from './lib/client';
 
-const fileLocation = parseArgs();
+const { args, port } = parseArgs({
+	args: [ 'file', 'line', 'offset' ]
+});
 
-references(fileLocation)
+const location: FileLocation = {
+	file: args[0],
+	line:  Number(args[1]),
+	offset: Number(args[2])
+};
+
+connect(port).then(() => references(location))
 	.then(response => response.refs.map(ref => {
 		const loc: FileLocation = {
 			file: ref.file,

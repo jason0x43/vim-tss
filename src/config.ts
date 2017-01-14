@@ -2,9 +2,12 @@
  * Send formatOptions from a config file to tsserver
  */
 
-import { configure, end, parseFileArg } from './lib/client';
+import { configure, connect, end } from './lib/client';
 import { error } from './lib/log';
+import { parseArgs } from './lib/opts';
 
-const file = parseFileArg();
+const { args, port } = parseArgs({ args: [ '[file]' ] });
 
-configure(file).catch(error).then(end);
+connect(port).then(() => configure(args[0]))
+	.catch(error)
+	.then(end);

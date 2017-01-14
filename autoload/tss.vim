@@ -1,8 +1,8 @@
 let s:path = expand('<sfile>:p:h')
-let s:startup_file = ''
-let s:ready = 0
 let s:job_names = {}
 let s:open_files = {}
+let s:opening_files = {}
+let s:closing_files = {}
 
 " Notify tsserver that a file is no longer being edited
 function! tss#closeFile(file)
@@ -10,15 +10,12 @@ function! tss#closeFile(file)
 		return
 	endif
 
-	if has_key(s:open_files, a:file)
-		unlet s:open_files[a:file]
-	endif
-
 	call s:debug('Closing', a:file)
 	let job = jobstart(['node', s:path . '/../bin/close.js', a:file], {
-		\ 'on_exit': function('s:exitHandler')
+		\ 'on_exit': function('s:closeFileHandler')
 		\ })
 	let s:job_names[job] = 'Close ' . a:file
+	let s:closing_files[job] = a:file
 endfunction
 
 " Populate the location list with the locations of definitions of the symbol
@@ -144,14 +141,13 @@ function! tss#openFile(file)
 		return
 	endif
 
-	let s:open_files[a:file] = 1
-
 	call s:debug('Opening', a:file)
 	let job = jobstart(['node', s:path . '/../bin/open.js', a:file], {
 		\ 'on_stderr': function('s:logHandler'),
-		\ 'on_exit': function('s:exitHandler')
+		\ 'on_exit': function('s:openFileHandler')
 		\ })
 	let s:job_names[job] = 'Open ' . a:file
+	let s:opening_files[job] = a:file
 endfunction
 
 " Display summary information for the symbol under the cursor
@@ -288,19 +284,15 @@ function! tss#start()
 		return
 	endif
 
-	let s:startup_file = expand('<afile>')
-	if s:startup_file == ''
-		let s:startup_file = expand('%')
-	endif
-
 	let cmd = ['node', s:path . '/../bin/start.js']
 	if g:tss_debug_tsserver
 		let cmd = add(cmd, '--debug-tsserver')
 	endif
 
-	call s:debug('Starting server for', s:startup_file)
+	call s:debug('Starting server')
 	let g:tss_server_id = jobstart(cmd, {
-		\ 'on_stderr': function('s:startHandler'),
+		\ 'on_stderr': function('s:logHandler'),
+		\ 'on_stdout': function('s:startHandler'),
 		\ 'on_exit': function('s:exitHandler')
 		\ })
 	let s:job_names[g:tss_server_id] = 'Server start'
@@ -346,6 +338,20 @@ function! s:completions(file, line, offset, ...)
 	return json_decode(output)
 endfunction
 
+" Run when a closeFile process finishes
+function! s:closeFileHandler(job_id, code)
+	let file = s:closing_files[a:job_id]
+	unlet s:closing_files[a:job_id]
+
+	if a:code == 0
+		if has_key(s:open_files, file)
+			unlet s:open_files[file]
+		endif
+	endif
+
+	call s:exitHandler(a:job_id, a:code)
+endfunction
+
 " Log a debug message
 function! s:debug(...)
 	if g:tss_verbose
@@ -365,7 +371,7 @@ function! s:exitHandler(job_id, code)
 	if a:job_id == g:tss_server_id
 		" If the server job died, clear the server ID field
 		let g:tss_server_id = 0
-		let s:ready = 0
+		let $VIM_TSS_PORT = ''
 	endif
 endfunction
 
@@ -476,6 +482,20 @@ function! s:print(message)
 	echo a:message
 endfunction
 
+" Run when an openFile process finishes
+function! s:openFileHandler(job_id, code)
+	let file = s:opening_files[a:job_id]
+	unlet s:opening_files[a:job_id]
+
+	if a:code == 0
+		if has_key(s:open_files, file)
+			let s:open_files[file] = 1
+		endif
+	endif
+
+	call s:exitHandler(a:job_id, a:code)
+endfunction
+
 " Notify tsserver that a file has new data
 function! s:reloadFile(file)
 	call s:debug('Reloading', a:file)
@@ -537,21 +557,32 @@ endfunction
 function! s:startHandler(job_id, data)
 	call s:logHandler(a:job_id, a:data)
 
-	if s:ready
+	if exists('$VIM_TSS_PORT')
 		return
 	endif
 
-	let data = join(a:data)
-	if data =~ 'Listening on'
-		let s:ready = 1
-		call s:debug('Server started')
+	for line in a:data
+		if line =~ '^VIM_TSS_PORT'
+			let $VIM_TSS_PORT = split(line, '=')[1]
 
-		" After the server starts, open the current file
-		if s:startup_file != ''
-			call s:debug('Opening initial file', s:startup_file)
-			call tss#openFile(s:startup_file)
+			call s:debug('Server started on port', $VIM_TSS_PORT)
+
+			" After the server starts, notify it of all currently open
+			" TypeScript files
+			let buffers = filter(range(1, bufnr('$')), 'bufloaded(v:val)')
+			let tsbuffers = filter(buffers,
+				\ 'getbufvar(v:val, "&filetype") == "typescript"')
+			let tsfiles = map(tsbuffers, 'bufname(v:val)')
+			for file in tsfiles 
+				call s:debug('Opening file', file)
+				call tss#openFile(file)
+			endfor
+			" if s:startup_file != ''
+			" 	call s:debug('Opening initial file', s:startup_file)
+			" 	call tss#openFile(s:startup_file)
+			" endif
 		endif
-	endif
+	endfor
 endfunction
 
 " Convert a set of location objects to loclist entries

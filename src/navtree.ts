@@ -2,11 +2,12 @@
  * Print the navtree structure for a file
  */
 
-import { navTree, end, success, failure, parseFileArg } from './lib/client';
+import { connect, end, failure, navTree, success } from './lib/client';
+import { parseArgs } from './lib/opts';
 
-const file = parseFileArg('file');
+const { args, port } = parseArgs({ args: [ 'file' ] });
 
-navTree(file)
+connect(port).then(() => navTree(args[0]))
 	.then(success)
 	.catch(failure)
 	.then(end);
