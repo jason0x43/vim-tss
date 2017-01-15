@@ -24,7 +24,7 @@ export interface ParsedArgs {
 	flags: { [key: string]: boolean };
 
 	// port is a special case
-	port?: number;
+	port?: string | number;
 }
 
 export function parseArgs(options?: ParseOpts): ParsedArgs {
@@ -96,6 +96,9 @@ export function parseArgs(options?: ParseOpts): ParsedArgs {
 	const port = Number(opts['port']);
 	if (!isNaN(port)) {
 		parsed.port = port;
+	}
+	else {
+		parsed.port = opts['port'];
 	}
 
 	return parsed;

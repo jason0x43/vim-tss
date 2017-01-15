@@ -104,19 +104,33 @@ export function configure(file?: string) {
 	});
 }
 
-export function connect(port?: number) {
+/**
+ * @param port A port number or socket file path
+ */
+export function connect(port?: string | number) {
 	if (!connected) {
-		port = port || Number(process.env['VIM_TSS_PORT']);
+		port = port || process.env['VIM_TSS_PORT'];
 
-		if (isNaN(port)) {
+		if (!isNaN(Number(port))) {
+			port = Number(port);
+		}
+
+		if (port == null) {
 			throw new Error('A port is required');
 		}
 
 		connected = new Promise<Socket>(resolve => {
 			debug(`client connecting to port ${port}`);
-			client = createConnection({ port }, () => {
-				resolve(client);
-			});
+			if (typeof port === 'string') {
+				client = createConnection(port, () => {
+					resolve(client);
+				});
+			}
+			else {
+				client = createConnection(port, 'localhost', () => {
+					resolve(client);
+				});
+			}
 
 			client.on('error', error => {
 				console.error('Error: ' + error.message);

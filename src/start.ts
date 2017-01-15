@@ -5,10 +5,12 @@
 import { ChildProcess, execSync, spawn } from 'child_process';
 import { createServer, Socket } from 'net';
 import { join } from 'path';
+import { unlink } from 'fs';
 import { debug, error, log, print } from './lib/log';
 import { MessageHandler } from './lib/messages';
 import { parseArgs } from './lib/opts';
 import { fileExists } from './lib/util';
+import { getPort } from './lib/connect';
 
 function commandExists(command: string) {
 	try {
@@ -131,19 +133,24 @@ function startTsserver() {
 let tsserver: ChildProcess;
 const clients: Socket[] = [];
 let exiting = false;
-let alreadyRunning = false;
 let serverBin: string;
 
-const { opts } = parseArgs({
+const { flags, port: portArg } = parseArgs({
 	flags: {
+		// Run the server as a background process
 		daemon: 'd',
-		'debug-tsserver': true
+
+		// Run the server in debug mode
+		'debug-tsserver': true,
+
+		// Use a TCP socket by default
+		'tcp': 't'
 	}
 });
 
-let debugTsserver = opts['debug-tsserver'];
-let daemonize = opts['daemon'];
-let port = Number(opts['port'] || 0);
+let debugTsserver = flags['debug-tsserver'];
+let daemonize = flags['daemon'];
+let port = getPort(portArg, flags['tcp']);
 
 // If this is a daemon, processing will continue from here. If not, this
 // process will start a daemon and exit.
@@ -157,10 +164,12 @@ if (daemon == null) {
 	process.on('SIGTERM', () => process.exit(0));
 
 	process.on('exit', () => {
-		if (!alreadyRunning) {
-			if (tsserver) {
-				tsserver.kill();
-			}
+		if (tsserver) {
+			tsserver.kill();
+		}
+		// Ensure socket file is removed when process exits
+		if (typeof port === 'string') {
+			unlink(port, _err => {});
 		}
 	});
 
@@ -215,20 +224,16 @@ if (daemon == null) {
 	});
 
 	server.on('error', (err: NodeJS.ErrnoException) => {
-		if (err.code === 'EADDRINUSE') {
-			debug(`Server is already running`);
-			log(`Listening on ${port}`);
-			alreadyRunning = true;
-			process.exit(0);
-		}
-		else {
-			error(`Error: ${err}`);
-			process.exit(1);
-		}
+		error(`Error: ${err}`);
+		process.exit(1);
 	});
 
 	server.listen(port, () => {
-		port = server.address().port;
+		// If port was 0, server will have auto-assigned a port
+		if (port === 0) {
+			port = server.address().port;
+		}
+
 		if (daemonize) {
 			process.send({ port });
 		}

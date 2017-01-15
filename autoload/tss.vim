@@ -83,7 +83,9 @@ function! tss#init()
 
 	setlocal omnifunc=tss#omnicomplete
 
-	if !g:tss_server_id
+	if exists('$VIM_TSS_PORT')
+		call s:openExistingBuffers()
+	else
 		call tss#start()
 	endif
 endfunction
@@ -279,10 +281,8 @@ endfunction
 
 " Start an instance of tsserver for the current TS project
 function! tss#start()
-	" Don't start the server if it's already running
-	if g:tss_server_id
-		return
-	endif
+	" Clear any existing port
+	let $VIM_TSS_PORT = ''
 
 	let cmd = ['node', s:path . '/../bin/start.js']
 	if g:tss_debug_tsserver
@@ -300,11 +300,6 @@ endfunction
 
 " Stop the instance of tsserver running for the current TS project
 function! tss#stop()
-	" Don't try to stop the server if it's not running
-	if !g:tss_server_id
-		return
-	endif
-
 	call s:debug('Stopping server')
 	let job = jobstart(['node', s:path . '/../bin/stop.js'], {
 		\ 'on_stderr': function('s:logHandler'),
@@ -557,10 +552,6 @@ endfunction
 function! s:startHandler(job_id, data)
 	call s:logHandler(a:job_id, a:data)
 
-	if exists('$VIM_TSS_PORT')
-		return
-	endif
-
 	for line in a:data
 		if line =~ '^VIM_TSS_PORT'
 			let $VIM_TSS_PORT = split(line, '=')[1]
@@ -569,19 +560,21 @@ function! s:startHandler(job_id, data)
 
 			" After the server starts, notify it of all currently open
 			" TypeScript files
-			let buffers = filter(range(1, bufnr('$')), 'bufloaded(v:val)')
-			let tsbuffers = filter(buffers,
-				\ 'getbufvar(v:val, "&filetype") == "typescript"')
-			let tsfiles = map(tsbuffers, 'bufname(v:val)')
-			for file in tsfiles 
-				call s:debug('Opening file', file)
-				call tss#openFile(file)
-			endfor
-			" if s:startup_file != ''
-			" 	call s:debug('Opening initial file', s:startup_file)
-			" 	call tss#openFile(s:startup_file)
-			" endif
+			call s:openExistingBuffers()
 		endif
+	endfor
+endfunction
+
+" Notify tsserver of all currently open TypeScript files. This function
+" assumes a tsserver instance is running and VIM_TSS_PORT has been set.
+function! s:openExistingBuffers()
+	let buffers = filter(range(1, bufnr('$')), 'bufloaded(v:val)')
+	let tsbuffers = filter(buffers,
+		\ 'getbufvar(v:val, "&filetype") == "typescript"')
+	let tsfiles = map(tsbuffers, 'bufname(v:val)')
+	for file in tsfiles
+		call s:debug('Opening file', file)
+		call tss#openFile(file)
 	endfor
 endfunction
 
