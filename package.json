@@ -7,8 +7,8 @@
     "typescript": "~2.1.0"
   },
   "license": "MIT",
-  "name": "vim-ts",
-  "repository": "https://github.com/jason0x43/vim-ts.git",
+  "name": "vim-tss",
+  "repository": "https://github.com/jason0x43/vim-tss.git",
   "scripts": {
     "install": "tsc",
     "build": "tsc"
