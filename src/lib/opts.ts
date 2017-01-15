@@ -63,14 +63,17 @@ export function parseArgs(options?: ParseOpts): ParsedArgs {
 				let flag = getOpt(possibleFlags, possibleOpt);
 
 				if (!opt && !flag) {
-					throw new Error(`Unknown option "${opt}"`);
+					throw new Error(`Unknown option "${possibleOpt}"`);
 				}
 
 				if (opt) {
+					if (rawArgs.length === 0) {
+						throw new Error(`Option "${opt}" requires a value`);
+					}
 					opts[opt] = rawArgs.shift();
 				}
 				else {
-					flags[opt] = true;
+					flags[flag] = true;
 				}
 			}
 			else {
@@ -84,7 +87,7 @@ export function parseArgs(options?: ParseOpts): ParsedArgs {
 	}
 	catch (error) {
 		print(`${error.message}\n`);
-		printUsage(options);
+		printUsage({ ...options, opts: possibleOpts });
 		process.exit(1);
 	}
 
@@ -103,19 +106,30 @@ function printUsage(options?: ParseOpts) {
 	let usage = basename(process.argv[1]);
 
 	const requiredArgs = options.args || [];
-	if (requiredArgs) {
+	if (requiredArgs. length > 0) {
 		usage += ` ${requiredArgs.join(' ')}`;
 	}
 
 	const possibleOpts = options.opts || {};
 	const optStrings = Object.keys(possibleOpts).map(opt => {
 		if (typeof possibleOpts[opt] === 'string') {
-			return `[-${possibleOpts[opt]}|--${opt}]`;
+			return `[-${possibleOpts[opt]}|--${opt} value]`;
 		}
-		return `[--${opt}]`;
+		return `[--${opt} value]`;
 	});
 	if (optStrings.length > 0) {
 		usage += ` ${optStrings.join(' ')}`;
+	}
+
+	const possibleFlags = options.flags || {};
+	const flagStrings = Object.keys(possibleFlags).map(flag => {
+		if (typeof possibleFlags[flag] === 'string') {
+			return `[-${possibleFlags[flag]}|--${flag}]`;
+		}
+		return `[--${flag}]`;
+	});
+	if (flagStrings.length > 0) {
+		usage += ` ${flagStrings.join(' ')}`;
 	}
 
 	print(`usage: ${usage}\n`);
