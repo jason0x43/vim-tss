@@ -3,6 +3,7 @@ let s:job_names = {}
 let s:open_files = {}
 let s:opening_files = {}
 let s:closing_files = {}
+let s:server_started = 0
 
 " Notify tsserver that a file is no longer being edited
 function! tss#closeFile(file)
@@ -281,8 +282,11 @@ endfunction
 
 " Start an instance of tsserver for the current TS project
 function! tss#start()
-	" Clear any existing port
-	let $VIM_TSS_PORT = ''
+	if s:server_started
+		return
+	endif
+
+	let s:server_started = 1
 
 	let cmd = ['node', s:path . '/../bin/start.js']
 	if g:tss_debug_tsserver
@@ -366,7 +370,7 @@ function! s:exitHandler(job_id, code)
 	if a:job_id == g:tss_server_id
 		" If the server job died, clear the server ID field
 		let g:tss_server_id = 0
-		let $VIM_TSS_PORT = ''
+		let s:server_started = 0
 	endif
 endfunction
 

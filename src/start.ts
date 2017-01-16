@@ -143,7 +143,7 @@ const { flags, port: portArg } = parseArgs({
 		// Run the server in debug mode
 		'debug-tsserver': true,
 
-		// Use a TCP socket by default
+		// Use a file socket by default
 		'tcp': 't'
 	}
 });

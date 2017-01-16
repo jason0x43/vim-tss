@@ -49,6 +49,8 @@ export function getPort(port?: string | number, useTcp?: boolean) {
 	port = port || process.env['VIM_TSS_PORT'];
 
 	if (port != null) {
+		debug('Using provided port', port);
+
 		const numericPort = Number(port);
 		if (!isNaN(numericPort)) {
 			// port was numeric, so return a number
@@ -60,10 +62,12 @@ export function getPort(port?: string | number, useTcp?: boolean) {
 
 	if (useTcp) {
 		// Return 0, which will cause Node to find an open TCP port
+		debug('Returning default TCP port');
 		return 0;
 	}
 
 	// Default behavior is to use a random socket file name
+	debug('Returning random file port');
 	const tag = randomBytes(20).toString('hex');
 	return join(tmpdir(), `vim-tsserve.${tag}.sock`);
 }
