@@ -25,7 +25,7 @@ const reader = new Promise<string>(resolve => {
 });
 
 reader.then(data => {
-	return connect(port).then(() => {
+	return connect(port).then((): Promise<any> => {
 		if (data != null) {
 			debug('Using data from stdin');
 			return openFile(file, data);

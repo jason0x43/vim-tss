@@ -4,7 +4,6 @@
 
 import { createConnection, Socket } from 'net';
 import { MessageHandler, send } from './messages';
-import { getProjectConfig } from './connect';
 import { readFile } from 'fs';
 import { debug, error, print } from './log';
 import { fileExists } from './util';
@@ -76,32 +75,18 @@ export function completions(location: CompletionLocation) {
 	});
 }
 
-export function configure(file?: string) {
-	if (!file) {
-		file = getProjectConfig('.');
-	}
-
-	const formatOptions = new Promise((resolve, reject) => {
-		readFile(file, (err, data) => {
-			if (err) {
-				reject(err);
-			}
-			else {
-				const config = JSON.parse(data.toString('utf8'));
-				resolve(config.formatCodeOptions);
-			}
-		});
-	});
-
-	return formatOptions.then(formatOptions => {
-		const request: protocol.ConfigureRequest = {
-			seq: getSequence(),
-			type: 'request',
-			command: 'configure',
-			arguments: { formatOptions }
-		};
-		return sendRequest(request);
-	});
+export function configure(file?: string, formatOptions?: protocol.FormatCodeSettings) {
+	const request: protocol.ConfigureRequest = {
+		seq: getSequence(),
+		type: 'request',
+		command: 'configure',
+		arguments: {
+			hostInfo: 'vim',
+			file,
+			formatOptions
+		}
+	};
+	return sendRequest(request);
 }
 
 /**
@@ -315,7 +300,7 @@ export function openFile(file: string, data?: string) {
 		command: 'open',
 		arguments: args
 	};
-	return sendRequest(request).then(end);
+	return sendRequest(request);
 }
 
 export function navBar(file: string) {
