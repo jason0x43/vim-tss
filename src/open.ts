@@ -12,6 +12,10 @@ const { args, port } = parseArgs({ args: [ 'file' ] });
 const tsconfig = getProjectConfig(args[0]);
 
 connect(port).then(() => openFile(args[0]))
-	.then(() => configure(args[0], tsconfig.formatCodeOptions))
+	.then(() => {
+		if (tsconfig.formatCodeOptions) {
+			return configure(args[0], tsconfig.formatCodeOptions);
+		}
+	})
 	.catch(error)
 	.then(end);
