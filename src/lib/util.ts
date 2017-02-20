@@ -29,11 +29,11 @@ export function getProjectConfig(file: string): any {
 		debug(`Considering ${filename}`);
 		if ((filename === 'tsconfig.json' || filename === 'jsconfig.json')) {
 			let configFile = join(path, filename);
-			let data = JSON.parse(readFileSync(configFile, { encoding: 'utf8' }));
+			let data = parseJSON(readFileSync(configFile, { encoding: 'utf8' }));
 			let parent = data.extends;
 			while (parent) {
 				configFile = join(path, parent);
-				let newData = JSON.parse(readFileSync(configFile, { encoding: 'utf8' }));
+				let newData = parseJSON(readFileSync(configFile, { encoding: 'utf8' }));
 				parent = newData.extends;
 				data = mixConfigs(data, newData);
 			}
@@ -73,4 +73,86 @@ function mixConfigs(child: any, parent: any) {
 	}
 
 	return config;
+}
+
+function parseJSON(text: string): any {
+	const textToParse = removeComments(text);
+	return JSON.parse(textToParse);
+}
+
+function removeComments(text: string): string {
+	let state: 'string' | 'block-comment' | 'line-comment' | 'default' = 'default';
+	let i = 0;
+
+	// Create an array of chars from the text, the blank out anything in a comment
+	const chars = text.split('');
+
+	while (i < chars.length) {
+		switch (state) {
+			case 'block-comment':
+				if (chars[i] === '*' && chars[i + 1] === '/') {
+					chars[i] = ' ';
+					chars[i + 1] = ' ';
+					state = 'default';
+					i += 2;
+				}
+				else if (chars[i] !== '\n') {
+					chars[i] = ' ';
+					i += 1;
+				}
+				else {
+					i += 1;
+				}
+				break;
+
+			case 'line-comment':
+				if (chars[i] === '\n') {
+					state = 'default';
+				}
+				else {
+					chars[i] = ' ';
+				}
+				i += 1;
+				break;
+
+			case 'string':
+				if (chars[i] === '"') {
+					state = 'default';
+					i += 1;
+				}
+				else if (chars[i] === '\\' && chars[i + 1] === '\\') {
+					i += 2;
+				}
+				else if (chars[i] === '\\' && chars[i + 1] === '"') {
+					i += 2;
+				}
+				else {
+					i += 1;
+				}
+				break;
+
+			default:
+				if (chars[i] === '"') {
+					state = 'string';
+					i += 1;
+				}
+				else if (chars[i] === '/' && chars[i + 1] === '*') {
+					chars[i] = ' ';
+					chars[i + 1] = ' ';
+					state = 'block-comment';
+					i += 2;
+				}
+				else if (chars[i] === '/' && chars[i] === '/') {
+					chars[i] = ' ';
+					chars[i + 1] = ' ';
+					state = 'line-comment';
+					i += 2;
+				}
+				else {
+					i += 1;
+				}
+		}
+	}
+
+	return chars.join('');
 }

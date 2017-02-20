@@ -13,10 +13,13 @@
     "noUnusedParameters": true,
     "outDir": "./bin",
     "preserveConstEnums": true,
+	/* ensure we can
+	handle block comments
+	*/
     "removeComments": true,
     "rootDir": "src",
     "sourceMap": false,
-    "target": "ES5"
+    "target": "ES5" // ensure we can handle line comments
   },
   "files": [
     "node_modules/typescript/lib/protocol.d.ts"
