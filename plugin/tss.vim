@@ -19,6 +19,9 @@ let g:tss_format_on_save = get(g:, 'tss_format_on_save', 0)
 " Ignore case in completions
 let g:tss_completion_ignore_case = get(g:, 'tss_completion_ignore_case', 0)
 
+" If true, automatically open the location list when it's populated
+let g:tss_auto_open_loclist = get(g:, 'tss_auto_open_loclist', 0)
+
 augroup vimtss
 	autocmd!
 	autocmd BufReadPost *.js,*.ts,*.tsx call tss#openFile(expand('<afile>'))

@@ -77,6 +77,10 @@ TypeScript or JavaScript file is opened.
 
 GLOBAL OPTIONS                                               *vim-tss-options*
 
+*g:tss_auto_open_loclist*       If 1, automatically open the location list
+                              when something populates it.
+                              (default) 0
+
 *g:tss_completion_ignore_case*  If 1, ignore text case when finding completion
                               matches.
                               (default) 0

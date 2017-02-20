@@ -144,6 +144,10 @@ function! tss#openFile(file)
 		return
 	endif
 
+	if !filereadable(a:file)
+		return
+	endif
+
 	call s:debug('Opening', a:file)
 	let job = jobstart(['node', s:path . '/../bin/open.js', a:file], {
 		\ 'on_stderr': function('s:logHandler'),
@@ -462,6 +466,10 @@ function! s:getLocations(type)
 
 		" Jump to the first item in the list
 		ll 1
+
+		if g:tss_auto_open_loclist 
+			lwindow
+		endif
 	else
 		let message = get(response, 'message', string(response))
 		call s:error('Error requesting locations: ' . message)
