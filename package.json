@@ -2,9 +2,9 @@
   "author": "jason0x43",
   "description": "Vim plugin for using TypeScript Services",
   "devDependencies": {
-    "@types/node": "~6.0.0",
-    "tslint": "~4.2.0",
-    "typescript": "~2.1.0"
+    "@types/node": "^6.0.0",
+    "tslint": "^4.4.0",
+    "typescript": "^2.2.0"
   },
   "license": "MIT",
   "name": "vim-tss",
