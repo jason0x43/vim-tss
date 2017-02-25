@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { debug } from './log';
-import { dirname, join, resolve } from 'path';
+import { dirname, extname, join, resolve } from 'path';
 
 export function fileExists(filename: string) {
 	try {
@@ -13,31 +13,26 @@ export function fileExists(filename: string) {
 }
 
 /**
- * Get the tsconfig data associated with a given file.
+ * Get the tsconfig file associated with a given file.
+ *
+ * @param file A ts or js filename
  */
-export function getProjectConfig(file: string): any {
+export function getProjectConfigFile(file: string, configName?: string): any {
 	debug(`Checking for config in ${file}`);
 
-	const path = resolve(file);
+	if (!configName) {
+		configName = `${extname(file).slice(1)}config.json`;
+	}
 
+	const path = resolve(file);
 	const stats = statSync(path);
 	if (!stats.isDirectory()) {
-		return getProjectConfig(dirname(path));
+		return getProjectConfigFile(dirname(path), configName);
 	}
 
 	for (let filename of readdirSync(path)) {
-		debug(`Considering ${filename}`);
-		if ((filename === 'tsconfig.json' || filename === 'jsconfig.json')) {
-			let configFile = join(path, filename);
-			let data = parseJSON(readFileSync(configFile, { encoding: 'utf8' }));
-			let parent = data.extends;
-			while (parent) {
-				configFile = join(path, parent);
-				let newData = parseJSON(readFileSync(configFile, { encoding: 'utf8' }));
-				parent = newData.extends;
-				data = mixConfigs(data, newData);
-			}
-			return data;
+		if (filename === configName) {
+			return join(path, filename);
 		}
 	}
 
@@ -46,7 +41,31 @@ export function getProjectConfig(file: string): any {
 		return null;
 	}
 
-	return getProjectConfig(dirname(path));
+	return getProjectConfigFile(dirname(path), configName);
+}
+
+/**
+ * Get the tsconfig data associated with a given file.
+ *
+ * @param file A ts or js filename
+ */
+export function getProjectConfig(file: string): any {
+	debug(`Checking for config in ${file}`);
+
+	let configFile = getProjectConfigFile(file);
+	if (!configFile) {
+		return null;
+	}
+
+	let data = parseJSON(readFileSync(configFile, { encoding: 'utf8' }));
+	let parent = data.extends;
+	while (parent) {
+		configFile = resolve(dirname(configFile), parent);
+		let newData = parseJSON(readFileSync(configFile, { encoding: 'utf8' }));
+		parent = newData.extends;
+		data = mixConfigs(data, newData);
+	}
+	return data;
 }
 
 function mixConfigs(child: any, parent: any) {
