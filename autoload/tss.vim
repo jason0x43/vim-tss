@@ -375,6 +375,7 @@ function! s:exitHandler(job_id, code)
 		" If the server job died, clear the server ID field
 		let g:tss_server_id = 0
 		let s:server_started = 0
+		let $VIM_TSS_PORT = ""
 	endif
 endfunction
 

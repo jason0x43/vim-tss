@@ -22,6 +22,11 @@ export function getPort(port?: string | number, useTcp?: boolean) {
 
 	port = port || process.env['VIM_TSS_PORT'];
 
+	// Environment variable may be empty
+	if (port === '') {
+		port = null;
+	}
+
 	if (port != null) {
 		debug('Using provided port', port);
 
