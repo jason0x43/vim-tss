@@ -7,10 +7,16 @@ import { MessageHandler, send } from './messages';
 import { readFile } from 'fs';
 import { debug, error, print } from './log';
 import { fileExists } from './util';
+import { resolve } from 'path';
 
 export interface FileLocation extends protocol.Location {
 	file: string;
 	text?: string;
+}
+
+export interface FileRange extends protocol.Location {
+	endLine: number;
+	endOffset: number;
 }
 
 export interface CompletionLocation extends protocol.Location {
@@ -46,6 +52,8 @@ export class ProtocolError extends Error {
 }
 
 export function closeFile(file: string) {
+	file = resolvePath(file);
+
 	if (!fileExists(file)) {
 		throw new Error(`File ${file} does not exist`);
 	}
@@ -60,6 +68,8 @@ export function closeFile(file: string) {
 }
 
 export function completions(location: CompletionLocation) {
+	location = Object.assign({}, location, { file: resolvePath(location.file)  });
+
 	if (!fileExists(location.file)) {
 		throw new Error(`File ${location.file} does not exist`);
 	}
@@ -76,6 +86,8 @@ export function completions(location: CompletionLocation) {
 }
 
 export function configure(file?: string, formatOptions?: protocol.FormatCodeSettings) {
+	file = resolvePath(file);
+
 	const request: protocol.ConfigureRequest = {
 		seq: getSequence(),
 		type: 'request',
@@ -130,12 +142,13 @@ export function connect(port?: string | number) {
 	return connected;
 }
 
-export function definition(fileLocation: FileLocation) {
+export function definition(location: FileLocation) {
+	location = Object.assign({}, location, { file: resolvePath(location.file)  });
 	const request: protocol.DefinitionRequest = {
 		seq: getSequence(),
 		type: 'request',
 		command: 'definition',
-		arguments: fileLocation
+		arguments: location
 	};
 	return sendRequest<protocol.FileSpan[]>(request, (response, resolve) => {
 		resolve(response.body);
@@ -163,15 +176,8 @@ export function exit() {
 	return sendRequest(request).then(end);
 }
 
-/**
- * A file range
- */
-export interface FileRange extends protocol.Location {
-	endLine: number;
-	endOffset: number;
-}
-
 export function getFileExtent(file: string) {
+	file = resolvePath(file);
 	if (!fileExists(file)) {
 		throw new Error(`File ${file} does not exist`);
 	}
@@ -197,6 +203,7 @@ export function failure(err: Error) {
 }
 
 export function format(file: string, fileExtent?: FileRange | Promise<FileRange>) {
+	file = resolvePath(file);
 	if (!fileExists(file)) {
 		throw new Error(`File ${file} does not exist`);
 	}
@@ -223,6 +230,7 @@ export function format(file: string, fileExtent?: FileRange | Promise<FileRange>
 }
 
 export function getSemanticDiagnostics(file: string) {
+	file = resolvePath(file);
 	if (!fileExists(file)) {
 		throw new Error(`File ${file} does not exist`);
 	}
@@ -239,6 +247,7 @@ export function getSemanticDiagnostics(file: string) {
 }
 
 export function getSyntacticDiagnostics(file: string) {
+	file = resolvePath(file);
 	if (!fileExists(file)) {
 		throw new Error(`File ${file} does not exist`);
 	}
@@ -286,6 +295,7 @@ export function info(file: string) {
 }
 
 export function openFile(file: string, data?: string) {
+	file = resolvePath(file);
 	if (!fileExists(file)) {
 		throw new Error(`File ${file} does not exist`);
 	}
@@ -304,6 +314,7 @@ export function openFile(file: string, data?: string) {
 }
 
 export function navBar(file: string) {
+	file = resolvePath(file);
 	if (!fileExists(file)) {
 		throw new Error(`File ${file} does not exist`);
 	}
@@ -320,6 +331,7 @@ export function navBar(file: string) {
 }
 
 export function navTo(args: protocol.NavtoRequestArgs) {
+	args = Object.assign({}, args, { file: resolvePath(args.file)  });
 	const request: protocol.NavtoRequest = {
 		seq: getSequence(),
 		type: 'request',
@@ -332,6 +344,7 @@ export function navTo(args: protocol.NavtoRequestArgs) {
 }
 
 export function navTree(file: string) {
+	file = resolvePath(file);
 	if (!fileExists(file)) {
 		throw new Error(`File ${file} does not exist`);
 	}
@@ -347,12 +360,13 @@ export function navTree(file: string) {
 	});
 }
 
-export function quickInfo(fileLocation: FileLocation) {
+export function quickInfo(location: FileLocation) {
+	location = Object.assign({}, location, { file: resolvePath(location.file)  });
 	const request: protocol.QuickInfoRequest = {
 		seq: getSequence(),
 		type: 'request',
 		command: 'quickinfo',
-		arguments: fileLocation
+		arguments: location
 	};
 	return sendRequest<protocol.QuickInfoResponseBody>(request, (response, resolve) => {
 		resolve(response.body);
@@ -364,12 +378,13 @@ export function success(value: any) {
 	print(`${JSON.stringify(response, null, '  ')}\n`);
 }
 
-export function references(fileLocation: FileLocation) {
+export function references(location: FileLocation) {
+	location = Object.assign({}, location, { file: resolvePath(location.file)  });
 	const request: protocol.ReferencesRequest = {
 		seq: getSequence(),
 		type: 'request',
 		command: 'references',
-		arguments: fileLocation
+		arguments: location
 	};
 	return sendRequest<protocol.ReferencesResponseBody>(request, (response, resolve) => {
 		resolve(response.body);
@@ -388,6 +403,7 @@ export function registerLogger(): Promise<Socket> {
 }
 
 export function reloadFile(file: string, tmpfile?: string) {
+	file = resolvePath(file);
 	if (!fileExists(file)) {
 		throw new Error(`File ${file} does not exist`);
 	}
@@ -419,6 +435,7 @@ export function reloadProjects() {
 }
 
 export function rename(location: RenameLocation) {
+	location = Object.assign({}, location, { file: resolvePath(location.file)  });
 	const request: protocol.RenameRequest = {
 		seq: getSequence(),
 		type: 'request',
@@ -431,6 +448,7 @@ export function rename(location: RenameLocation) {
 }
 
 export function signatureHelp(location: FileLocation) {
+	location = Object.assign({}, location, { file: resolvePath(location.file)  });
 	const request: protocol.SignatureHelpRequest = {
 		seq: getSequence(),
 		type: 'request',
@@ -443,6 +461,7 @@ export function signatureHelp(location: FileLocation) {
 }
 
 export function typeDefinition(location: FileLocation) {
+	location = Object.assign({}, location, { file: resolvePath(location.file)  });
 	const request: protocol.TypeDefinitionRequest = {
 		seq: getSequence(),
 		type: 'request',
@@ -469,6 +488,13 @@ let connected: Promise<Socket>;
 
 function getSequence() {
 	return Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+}
+
+function resolvePath(file?: string) {
+	if (file == null) {
+		return file;
+	}
+	return resolve(file);
 }
 
 function sendRequest<T>(request: protocol.Request, callback?: RequestCallback<T>): Promise<T> {
