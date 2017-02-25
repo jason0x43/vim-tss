@@ -467,7 +467,7 @@ function! s:getLocations(type)
 		" Jump to the first item in the list
 		ll 1
 
-		if g:tss_auto_open_loclist 
+		if g:tss_auto_open_loclist
 			lwindow
 		endif
 	else
@@ -495,7 +495,7 @@ function! s:openFileHandler(job_id, code)
 	unlet s:opening_files[a:job_id]
 
 	if a:code == 0
-		if has_key(s:open_files, file)
+		if !has_key(s:open_files, file)
 			let s:open_files[file] = 1
 		endif
 	endif
@@ -516,6 +516,7 @@ function! s:reloadFiles()
 	let buf = bufnr('%')
 
 	for file in keys(s:open_files)
+		call s:debug('Reloading file ', file)
 		call execute('buffer ' . bufnr(file))
 		call s:reloadFile(file)
 	endfor
