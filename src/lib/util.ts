@@ -12,16 +12,40 @@ export function fileExists(filename: string) {
 	}
 }
 
+export function getProjectRoot(file: string): string {
+	const configFile = getProjectConfigFile(file);
+	if (!configFile) {
+		return dirname(resolve(file));
+	}
+
+	let dir = dirname(file);
+	while (dirname(dir) !== dir) {
+		let entries = readdirSync(dir);
+		if (entries.find(entry => entry === 'node_modules')) {
+			return dir;
+		}
+		dir = dirname(dir);
+	}
+
+	return dirname(resolve(configFile));
+}
+
 /**
  * Get the tsconfig file associated with a given file.
  *
  * @param file A ts or js filename
  */
-export function getProjectConfigFile(file: string, configName?: string): any {
+export function getProjectConfigFile(file: string, configName?: string): string | null {
 	debug(`Checking for config in ${file}`);
 
 	if (!configName) {
-		configName = `${extname(file).slice(1)}config.json`;
+		const ext = extname(file);
+		if (ext) {
+			configName = `${extname(file).slice(1)}config.json`;
+		}
+		else {
+			configName = 'tsconfig.json';
+		}
 	}
 
 	const path = resolve(file);

@@ -9,7 +9,7 @@ import { unlink } from 'fs';
 import { debug, error, log, print } from './lib/log';
 import { MessageHandler } from './lib/messages';
 import { parseArgs } from './lib/opts';
-import { fileExists } from './lib/util';
+import { fileExists, getProjectRoot } from './lib/util';
 import { getPort } from './lib/connect';
 
 function commandExists(command: string) {
@@ -158,6 +158,10 @@ let daemon: number;
 if (daemonize) {
 	daemon = runAsDaemon();
 }
+
+// Ensure the server is started in the project root
+const projectRoot = getProjectRoot(process.cwd());
+process.chdir(projectRoot);
 
 if (daemon == null) {
 	process.on('SIGINT', () => process.exit(0));
