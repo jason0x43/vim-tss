@@ -237,7 +237,7 @@ function! tss#rename(...)
 	call s:reloadFiles()
 
 	call s:debug('Getting rename locations for symbol at (', pos[1], ',',
-		\ pos[2], 'in', file)
+		\ pos[2], ') in', file)
 	let output = system('node ' .
 		\ shellescape(s:path . '/../bin/rename.js') . flags .
 		\ shellescape(file) . ' ' . pos[1] . ' ' . pos[2])
