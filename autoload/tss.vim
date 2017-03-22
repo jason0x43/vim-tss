@@ -463,12 +463,13 @@ function! s:getLocations(type)
 
 	let response = json_decode(output)
 	if get(response, 'success', 0)
-		call setloclist(0, s:toLoclistEntries(response.body), 'a')
+		let entries = s:toLoclistEntries(response.body)
+		call setloclist(0, entries, 'a')
 
 		" Jump to the first item in the list
 		ll 1
 
-		if g:tss_auto_open_loclist
+		if g:tss_auto_open_loclist && len(entries) > 1
 			lwindow
 		endif
 	else
