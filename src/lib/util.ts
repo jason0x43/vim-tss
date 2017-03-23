@@ -185,7 +185,7 @@ function removeComments(text: string): string {
 					state = 'block-comment';
 					i += 2;
 				}
-				else if (chars[i] === '/' && chars[i] === '/') {
+				else if (chars[i] === '/' && chars[i + 1] === '/') {
 					chars[i] = ' ';
 					chars[i + 1] = ' ';
 					state = 'line-comment';
