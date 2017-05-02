@@ -342,7 +342,7 @@ function! s:completions(file, line, offset, ...)
 endfunction
 
 " Run when a closeFile process finishes
-function! s:closeFileHandler(job_id, code)
+function! s:closeFileHandler(job_id, code, event)
 	let file = s:closing_files[a:job_id]
 	unlet s:closing_files[a:job_id]
 
@@ -352,7 +352,7 @@ function! s:closeFileHandler(job_id, code)
 		endif
 	endif
 
-	call s:exitHandler(a:job_id, a:code)
+	call s:exitHandler(a:job_id, a:code, a:event)
 endfunction
 
 " Log a debug message
@@ -364,7 +364,7 @@ function! s:debug(...)
 endfunction
 
 " Handle exit messages from async jobs
-function! s:exitHandler(job_id, code)
+function! s:exitHandler(job_id, code, event)
 	if a:code
 		call s:error(s:job_names[a:job_id] . ' failed: ' . a:code)
 	endif
@@ -481,7 +481,7 @@ function! s:getLocations(type)
 endfunction
 
 " Display messages from a process
-function! s:logHandler(job_id, data)
+function! s:logHandler(job_id, data, event)
 	call s:debug('Log:', join(a:data))
 endfunction
 
@@ -492,7 +492,7 @@ function! s:print(message)
 endfunction
 
 " Run when an openFile process finishes
-function! s:openFileHandler(job_id, code)
+function! s:openFileHandler(job_id, code, event)
 	let file = s:opening_files[a:job_id]
 	unlet s:opening_files[a:job_id]
 
@@ -502,7 +502,7 @@ function! s:openFileHandler(job_id, code)
 		endif
 	endif
 
-	call s:exitHandler(a:job_id, a:code)
+	call s:exitHandler(a:job_id, a:code, a:event)
 endfunction
 
 " Notify tsserver that a file has new data
@@ -564,8 +564,8 @@ function! s:renameLocations(file, symbol, locs)
 endfunction
 
 " Handle tsserver startup messages
-function! s:startHandler(job_id, data)
-	call s:logHandler(a:job_id, a:data)
+function! s:startHandler(job_id, data, event)
+	call s:logHandler(a:job_id, a:data, a:event)
 
 	for line in a:data
 		if line =~ '^VIM_TSS_PORT'
