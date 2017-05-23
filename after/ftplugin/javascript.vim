@@ -10,6 +10,6 @@ let g:neomake_javascript_tss_maker = {
             \ '%C%\s%\+%m'
         \ }
 
-let g:neomake_javascript_enabled_makers = ['jshint', 'tss']
+let g:neomake_javascript_enabled_makers = get(g:, 'neomake_javascript_enabled_makers', []) + ['tss']
 
 call tss#init()
