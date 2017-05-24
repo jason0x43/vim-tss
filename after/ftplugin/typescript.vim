@@ -1,3 +1,8 @@
+if exists('tss_loaded')
+	finish
+endif
+let tss_loaded = 1
+
 " Replace the default neomake tsc maker; this will only have an effect if
 " neomake is installed.
 let g:neomake_typescript_tsc_maker = {
