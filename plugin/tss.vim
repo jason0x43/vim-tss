@@ -1,7 +1,7 @@
-if exists('tss_loaded')
+if exists('g:tss_loaded')
   finish
 endif
-let tss_loaded = 1
+let g:tss_loaded = 1
 
 " If non-zero, display debug messages
 let g:tss_verbose = get(g:, 'tss_verbose', 0)
