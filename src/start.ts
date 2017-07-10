@@ -31,11 +31,10 @@ function findServerBin() {
 	}
 
 	// Try project
-	try {
-		return require.resolve('typescript/bin/tsserver');
-	}
-	catch (error) {
-		// ignore
+	serverBin = join('node_modules', '.bin', 'tsserver');
+	debug(`Trying local tsserver at ${serverBin}`);
+	if (fileExists(serverBin)) {
+		return serverBin;
 	}
 
 	// Try global
