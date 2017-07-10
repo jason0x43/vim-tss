@@ -9,7 +9,7 @@ import { unlink } from 'fs';
 import { debug, error, log, print } from './lib/log';
 import { MessageHandler } from './lib/messages';
 import { parseArgs } from './lib/opts';
-import { fileExists, getProjectRoot } from './lib/util';
+import { fileExists } from './lib/util';
 import { getPort } from './lib/connect';
 
 function commandExists(command: string) {
@@ -31,16 +31,17 @@ function findServerBin() {
 	}
 
 	// Try project
-	serverBin = join('node_modules', '.bin', 'tsserver');
-	debug(`Trying local tsserver at ${serverBin}`);
-	if (fileExists(serverBin)) {
-		return serverBin;
+	try {
+		return require.resolve('typescript/bin/tsserver');
+	}
+	catch (error) {
+		// ignore
 	}
 
 	// Try global
 	serverBin = 'tsserver';
 	debug('Trying global tsserver');
-	if (!commandExists(serverBin)) {
+	if (commandExists(serverBin)) {
 		return serverBin;
 	}
 
@@ -158,10 +159,6 @@ let daemon: number;
 if (daemonize) {
 	daemon = runAsDaemon();
 }
-
-// Ensure the server is started in the project root
-const projectRoot = getProjectRoot(process.cwd());
-process.chdir(projectRoot);
 
 if (daemon == null) {
 	process.on('SIGINT', () => process.exit(0));
